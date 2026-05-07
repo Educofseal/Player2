@@ -1,0 +1,14 @@
+{
+    "usuarios": [
+        {"id": 1,  "nome": "João",    "interesses": ["anime", "jogos", "mangá", "rpg"]},
+        {"id": 2,  "nome": "Maria",   "interesses": ["jogos", "filmes", "anime", "cosplay"]},
+        {"id": 3,  "nome": "Lucas",   "interesses": ["rpg", "mangá", "jogos", "board games"]},
+        {"id": 4,  "nome": "Ana",     "interesses": ["cosplay", "anime", "filmes", "k-pop"]},
+        {"id": 5,  "nome": "Pedro",   "interesses": ["programação", "jogos", "hacking", "rpg"]},
+        {"id": 6,  "nome": "Julia",   "interesses": ["k-pop", "anime", "cosplay", "mangá"]},
+        {"id": 7,  "nome": "Carlos",  "interesses": ["board games", "rpg", "xadrez"]},
+        {"id": 8,  "nome": "Bruna",   "interesses": ["filmes", "séries", "k-pop"]},
+        {"id": 9,  "nome": "Rafael",  "interesses": ["hacking", "programação", "jogos", "anime"]},
+        {"id": 10, "nome": "Camila",  "interesses": ["mangá", "anime", "cosplay", "filmes"]}
+    ]
+}
