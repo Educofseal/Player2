@@ -12,7 +12,6 @@ class Graph:
         self._arestas: List[Edge] = []
 
     def adicionar_usuario(self, usuario: User) -> None:
-        """Adiciona um usuário (nó) ao grafo."""
         self._usuarios[usuario.id] = usuario
         if usuario.id not in self._adjacencia:
             self._adjacencia[usuario.id] = []
@@ -66,4 +65,4 @@ class Graph:
         return (
             f"Graph(usuários={self.total_usuarios()}, "
             f"arestas={self.total_arestas()})"
-        )
+        ) 
