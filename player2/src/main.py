@@ -54,7 +54,8 @@ def main(page: ft.Page) -> None:
     )
 
     grafo = Graph()
-    json_path = os.path.join(os.path.dirname(__file__), "usuarios.json")
+    _src_dir  = os.path.dirname(os.path.abspath(__file__))
+    json_path = os.path.join(os.path.dirname(_src_dir), "usuarios.json")
 
     if os.path.exists(json_path):
         usuarios = carregar_usuarios_json(json_path)
@@ -68,14 +69,20 @@ def main(page: ft.Page) -> None:
     reg_service = RegistrationService(grafo, caminho_json=json_path if os.path.exists(json_path) else None)
 
     estado = {
-        "usuario_atual": None,  
-        "matches": [],          
+        "usuario_atual":  None,
+        "matches":        [],
+        "swipe_fila":     None,
+        "swipe_idx":      None,
+        "swipe_historico": None,
     }
 
 
     def ir_para_swipe(novo_usuario: User) -> None:
-        estado["usuario_atual"] = novo_usuario
-        estado["matches"] = []
+        estado["usuario_atual"]   = novo_usuario
+        estado["matches"].clear()
+        estado["swipe_fila"]      = None
+        estado["swipe_idx"]       = None
+        estado["swipe_historico"] = None
         page.go("/swipe")
 
     def ir_para_matches() -> None:
@@ -85,8 +92,11 @@ def main(page: ft.Page) -> None:
         page.go("/swipe")
 
     def voltar_para_registro() -> None:
-        estado["usuario_atual"] = None
-        estado["matches"] = []
+        estado["usuario_atual"]   = None
+        estado["matches"].clear()
+        estado["swipe_fila"]      = None
+        estado["swipe_idx"]       = None
+        estado["swipe_historico"] = None
         page.go("/register")
 
 
@@ -100,16 +110,13 @@ def main(page: ft.Page) -> None:
                 page.go("/register")
                 return
 
-            def salvar_matches(lista: list) -> None:
-                estado["matches"] = lista
-
             view = build_swipe_view(
                 page=page,
                 eu=usuario,
                 grafo=grafo,
                 on_ver_matches=ir_para_matches,
                 on_voltar=voltar_para_registro,
-                matches_sink=salvar_matches,
+                estado=estado,
             )
             page.views.append(view)
 

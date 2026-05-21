@@ -20,19 +20,22 @@ class RecommendationService:
 
         distancias, predecessores = dijkstra(self.grafo, origem_id)
 
-        recomendacoes = []
+        conectados = []
+        desconectados = []
+
         for uid, custo in distancias.items():
             if uid == origem_id:
                 continue
-            if custo == float("inf"):
-                continue
-
             usuario = self.grafo.get_usuario(uid)
-            caminho = reconstruir_caminho(predecessores, uid)
-            recomendacoes.append((usuario, custo, caminho))
+            if custo == float("inf"):
+                desconectados.append((usuario, float("inf"), []))
+            else:
+                caminho = reconstruir_caminho(predecessores, uid)
+                conectados.append((usuario, custo, caminho))
 
-        recomendacoes.sort(key=lambda x: x[1])
-        return recomendacoes
+        conectados.sort(key=lambda x: x[1])
+        desconectados.sort(key=lambda x: x[0].nome)
+        return conectados + desconectados
 
     #  BFS                                             
 

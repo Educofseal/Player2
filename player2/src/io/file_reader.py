@@ -24,6 +24,7 @@ def carregar_usuarios_json(caminho: str) -> List[User]:
                 id=int(item["id"]),
                 nome=str(item["nome"]),
                 interesses=[str(i).lower() for i in item.get("interesses", [])],
+                bio=str(item.get("bio", "")),
             )
             usuarios.append(usuario)
         except KeyError as e:
@@ -40,6 +41,7 @@ def carregar_usuarios_dict(dados: dict) -> List[User]:
             id=int(item["id"]),
             nome=str(item["nome"]),
             interesses=[str(i).lower() for i in item.get("interesses", [])],
+            bio=str(item.get("bio", "")),
         )
         usuarios.append(usuario)
     return usuarios

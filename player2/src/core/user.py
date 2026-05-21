@@ -9,6 +9,7 @@ class User:
     id: int
     nome: str
     interesses: List[str] = field(default_factory=list)
+    bio: str = ""
 
     def calcular_afinidade(self, outro: "User") -> int:
 

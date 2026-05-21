@@ -7,8 +7,6 @@ from src.services.recommendation_service import RecommendationService
 from src.ui import theme as T
 
 
-# ── Helpers internos ──────────────────────────────────────────
-
 def _afinidade_pct(usuario: User, outro: User) -> int:
     em_comum = usuario.calcular_afinidade(outro)
     total = max(len(usuario.interesses), len(outro.interesses), 1)
@@ -28,7 +26,6 @@ def _build_card(
     pct         = _afinidade_pct(eu, item_usuario)
     emoji       = T.emoji_para(item_usuario.id)
 
-    # Tags interesses em comum (verde) e únicos dele (roxo)
     tags_row = ft.Row(
         controls=[
             *[T.tag_chip(i, "#0d2e1a", T.LIKE_COLOR, "#86efac") for i in em_comum],
@@ -39,18 +36,21 @@ def _build_card(
         run_spacing=6,
     )
 
-    # Caminho Dijkstra
+    sem_conexao = custo == float("inf")
     nos_caminho = [grafo.get_usuario(uid).nome for uid in caminho_ids]
-    caminho_str = " → ".join(nos_caminho) if nos_caminho else "—"
+    caminho_str = " → ".join(nos_caminho) if nos_caminho else "Sem interesses em comum"
+    custo_str   = "sem conexão direta" if sem_conexao else f"custo: {custo:.4f}"
 
     path_row = ft.Container(
         content=ft.Column(
             controls=[
                 ft.Text("🗺  Caminho Dijkstra", size=10, color=T.MUTED,
                         weight=ft.FontWeight.W_600),
-                ft.Text(caminho_str, size=11, color=T.GOLD_COLOR,
-                        font_family=T.FONT_MONO, no_wrap=False),
-                ft.Text(f"custo: {custo:.4f}", size=10, color=T.MUTED,
+                ft.Text(caminho_str, size=11,
+                        color=T.MUTED if sem_conexao else T.GOLD_COLOR,
+                        font_family=T.FONT_MONO, no_wrap=False,
+                        italic=sem_conexao),
+                ft.Text(custo_str, size=10, color=T.MUTED,
                         font_family=T.FONT_MONO),
             ],
             spacing=3,
@@ -61,13 +61,12 @@ def _build_card(
         padding=ft.Padding(12, 10, 12, 10),
     )
 
-    # Barra de afinidade
     bar_fill = ft.Container(
-        width=0,   # será animada pelo AnimatedSwitcher via expand
+        width=0, 
         height=4,
         bgcolor=T.ACCENT2,
         border_radius=2,
-        expand=pct,  # usa expand como proporção
+        expand=pct,
     )
     bar_bg = ft.Container(
         content=ft.Row(
@@ -80,7 +79,6 @@ def _build_card(
         expand=True,
     )
 
-    # Avatar circular
     avatar = ft.Container(
         content=ft.Text(emoji, size=56, text_align=ft.TextAlign.CENTER),
         width=100,
@@ -94,7 +92,6 @@ def _build_card(
     return ft.Container(
         content=ft.Column(
             controls=[
-                # Topo — avatar + nome
                 ft.Row(
                     controls=[
                         avatar,
@@ -110,6 +107,11 @@ def _build_card(
                                     size=11, color=T.MUTED,
                                     font_family=T.FONT_MONO,
                                 ),
+                                *([ft.Text(
+                                    item_usuario.bio,
+                                    size=12, color=T.MUTED,
+                                    italic=True, no_wrap=False,
+                                )] if item_usuario.bio else []),
                                 ft.Row(
                                     controls=[
                                         ft.Text("Afinidade", size=11, color=T.MUTED),
@@ -144,14 +146,12 @@ def _build_card(
 
                 T.divider(),
 
-                # Interesses
                 ft.Text("Interesses", size=10, color=T.MUTED,
                         weight=ft.FontWeight.W_500),
                 tags_row,
 
                 T.divider(),
 
-                # Dijkstra path
                 path_row,
             ],
             spacing=10,
@@ -171,8 +171,6 @@ def _build_card(
     )
 
 
-# ── View principal ────────────────────────────────────────────
-
 def build_swipe_view(
     page: ft.Page,
     eu: User,
@@ -180,27 +178,35 @@ def build_swipe_view(
     on_ver_matches: Callable[[], None],
     on_voltar: Callable[[], None],
     matches_sink: Optional[Callable[[list], None]] = None,
+    estado: Optional[dict] = None,
 ) -> ft.View:
 
     servico = RecommendationService(grafo)
 
-    # Gera fila ordenada por Dijkstra
-    recomendacoes: List[Tuple[User, float, List[int]]] = servico.recomendar(eu.id)
+    if estado is not None and estado.get("swipe_fila") is not None:
 
-    # Estado
-    fila        = list(recomendacoes)   # [(User, custo, caminho)]
-    idx         = [0]                   # índice atual (mutável em closure)
-    historico   = []                    # para undo
-    matches     = []                    # (User, em_comum, custo)
+        fila      = estado["swipe_fila"]
+        idx       = estado["swipe_idx"]
+        historico = estado["swipe_historico"]
+        matches   = estado["matches"]
+    else:
 
-    # Refs para atualização dinâmica
+        recomendacoes: List[Tuple[User, float, List[int]]] = servico.recomendar(eu.id)
+        fila      = list(recomendacoes)
+        idx       = [0]
+        historico = []
+        matches   = estado["matches"] if estado is not None else []
+        if estado is not None:
+            estado["swipe_fila"]      = fila
+            estado["swipe_idx"]       = idx
+            estado["swipe_historico"] = historico
+
     card_area       = ft.Ref[ft.Column]()
     stats_matches   = ft.Ref[ft.Text]()
     stats_restantes = ft.Ref[ft.Text]()
     stats_compat    = ft.Ref[ft.Text]()
     snack_ref       = ft.Ref[ft.SnackBar]()
 
-    # ── Helpers ───────────────────────────────────────────────
 
     def item_atual() -> Optional[Tuple]:
         if idx[0] < len(fila):
@@ -223,7 +229,6 @@ def build_swipe_view(
 
         remaining = fila[idx[0]:]
         if not remaining:
-            # Estado vazio
             card_area.current.controls.append(
                 ft.Container(
                     content=ft.Column(
@@ -256,10 +261,8 @@ def build_swipe_view(
                 )
             )
         else:
-            # Mostra até 3 cards no stack (visual de profundidade)
             for i, (usuario, custo, caminho) in enumerate(remaining[:3]):
                 card = _build_card(usuario, eu, custo, caminho, grafo)
-                # Cards de trás ficam levemente menores
                 scale = 1.0 - (i * 0.03)
                 offset_y = i * 10
                 card_area.current.controls.append(
@@ -274,8 +277,6 @@ def build_swipe_view(
         atualizar_stats()
         page.update()
 
-    # ── Ações de swipe ────────────────────────────────────────
-
     def acao_like(e=None, super_like=False):
         item = item_atual()
         if not item:
@@ -285,8 +286,6 @@ def build_swipe_view(
         historico.append(("like", item))
         matches.append((usuario, em_comum, custo))
         idx[0] += 1
-        if matches_sink:
-            matches_sink(list(matches))  # sincroniza com estado global
         renderizar_cards()
         _mostrar_match(usuario, em_comum, custo, super_like)
 
@@ -313,8 +312,6 @@ def build_swipe_view(
 
     def acao_super(e=None):
         acao_like(super_like=True)
-
-    # ── Match dialog ──────────────────────────────────────────
 
     def _mostrar_match(usuario: User, em_comum: List[str], custo: float,
                        super_like: bool = False):
@@ -419,9 +416,6 @@ def build_swipe_view(
         dlg.open = False
         page.update()
 
-    # ── Layout ────────────────────────────────────────────────
-
-    # Barra de stats
     def _stat_pill(label: str, ref) -> ft.Container:
         return ft.Container(
             content=ft.Column(
@@ -452,7 +446,6 @@ def build_swipe_view(
         spacing=8,
     )
 
-    # Botões de ação
     def _action_btn(emoji: str, cor_bg: str, cor_borda: str,
                     handler, size=58, font_size=22) -> ft.Container:
         return ft.Container(
@@ -477,7 +470,6 @@ def build_swipe_view(
         spacing=14,
     )
 
-    # Header
     header = ft.Row(
         controls=[
             ft.Row(
@@ -526,7 +518,6 @@ def build_swipe_view(
             ft.Container(height=4),
             stats_row,
             ft.Container(height=4),
-            # Área de cards — Column empilhada (stack visual)
             ft.Container(
                 content=ft.Column(
                     ref=card_area,
@@ -542,7 +533,6 @@ def build_swipe_view(
         expand=True,
     )
 
-    # Renderiza os cards ao construir
     renderizar_cards()
 
     return ft.View(

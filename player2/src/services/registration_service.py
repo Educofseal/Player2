@@ -23,7 +23,7 @@ class RegistrationService:
         ids = self.grafo.get_todos_ids()
         return max(ids) + 1 if ids else 1
 
-    def validar(self, nome: str, interesses: List[str]) -> List[str]:
+    def validar(self, nome: str, interesses: List[str], bio: str = "") -> List[str]:
       
         erros = []
         if not nome or not nome.strip():
@@ -42,11 +42,14 @@ class RegistrationService:
         elif len(interesses) > 10:
             erros.append("Selecione no máximo 10 interesses.")
 
+        if len(bio.strip()) > 160:
+            erros.append("A bio deve ter no máximo 160 caracteres.")
+
         return erros
 
-    def cadastrar(self, nome: str, interesses: List[str]) -> User:
+    def cadastrar(self, nome: str, interesses: List[str], bio: str = "") -> User:
 
-        erros = self.validar(nome, interesses)
+        erros = self.validar(nome, interesses, bio)
         if erros:
             raise ValueError(" | ".join(erros))
 
@@ -55,6 +58,7 @@ class RegistrationService:
             id=novo_id,
             nome=nome.strip(),
             interesses=[i.lower() for i in interesses],
+            bio=bio.strip(),
         )
 
         self.grafo.adicionar_usuario(novo_usuario)
@@ -77,6 +81,7 @@ class RegistrationService:
                 "id": usuario.id,
                 "nome": usuario.nome,
                 "interesses": usuario.interesses,
+                "bio": usuario.bio,
             })
 
             with open(self.caminho_json, "w", encoding="utf-8") as f:

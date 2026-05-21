@@ -12,17 +12,15 @@ def build_register_view(
     on_cadastro_ok: Callable[[User], None],
 ) -> ft.View:
 
-    # ── Estado local ──────────────────────────────────────────
     interesses_selecionados: List[str] = []
     checkboxes: List[ft.Checkbox] = []
 
-    # ── Refs ──────────────────────────────────────────────────
     nome_field    = ft.Ref[ft.TextField]()
+    bio_field     = ft.Ref[ft.TextField]()
     erro_text     = ft.Ref[ft.Text]()
     btn_cadastrar = ft.Ref[ft.ElevatedButton]()
     contador_ref  = ft.Ref[ft.Text]()
 
-    # ── Handlers ──────────────────────────────────────────────
     def on_interesse_change(e: ft.ControlEvent) -> None:
         cb: ft.Checkbox = e.control
         interesse = cb.data
@@ -47,7 +45,8 @@ def build_register_view(
             return
 
         try:
-            novo_usuario = registration_service.cadastrar(nome, interesses_selecionados)
+            bio = bio_field.current.value or ""
+            novo_usuario = registration_service.cadastrar(nome, interesses_selecionados, bio)
             on_cadastro_ok(novo_usuario)
         except ValueError as ex:
             erro_text.current.value = str(ex)
@@ -57,7 +56,6 @@ def build_register_view(
         erro_text.current.value = ""
         page.update()
 
-    # ── Grid de interesses ────────────────────────────────────
     grid_interesses = ft.GridView(
         expand=False,
         runs_count=3,
@@ -87,7 +85,6 @@ def build_register_view(
         checkboxes.append(cb)
         grid_interesses.controls.append(cb)
 
-    # ── Layout da view ────────────────────────────────────────
     content = ft.Column(
         controls=[
 
@@ -118,7 +115,6 @@ def build_register_view(
                 padding=ft.Padding(0, 0, 0, 20),
             ),
 
-            # Campo nome
             ft.Text("Seu nome", size=12, color=T.MUTED, weight=ft.FontWeight.W_500),
             ft.TextField(
                 ref=nome_field,
@@ -137,7 +133,25 @@ def build_register_view(
 
             ft.Container(height=4),
 
-            # Seção interesses
+            ft.Text("Sua bio", size=12, color=T.MUTED, weight=ft.FontWeight.W_500),
+            ft.TextField(
+                ref=bio_field,
+                hint_text="Uma frase sobre você (opcional, máx. 160 caracteres)",
+                hint_style=ft.TextStyle(color=T.MUTED, size=13),
+                text_style=ft.TextStyle(color=T.TEXT, size=13),
+                bgcolor=T.SURFACE2,
+                border_color=T.BORDER,
+                focused_border_color=T.ACCENT,
+                border_radius=T.RADIUS,
+                content_padding=ft.Padding(16, 14, 16, 14),
+                multiline=True,
+                min_lines=2,
+                max_lines=3,
+                max_length=160,
+                cursor_color=T.ACCENT2,
+            ),
+
+            ft.Container(height=4),
             ft.Row(
                 controls=[
                     ft.Text("Seus interesses", size=12, color=T.MUTED,
@@ -162,7 +176,6 @@ def build_register_view(
 
             ft.Container(height=4),
 
-            # Mensagem de erro
             ft.Text(
                 ref=erro_text,
                 value="",
@@ -171,7 +184,6 @@ def build_register_view(
                 italic=True,
             ),
 
-            # Botão cadastrar
             ft.ElevatedButton(
                 ref=btn_cadastrar,
                 content=ft.Text(

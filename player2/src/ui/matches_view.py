@@ -1,9 +1,3 @@
-"""
-Módulo: matches_view.py
-Responsabilidade: Tela que exibe todos os usuários que o novo
-                  usuário curtiu (matches), com detalhes de afinidade.
-"""
-
 import flet as ft
 from typing import Callable, List, Tuple
 
@@ -35,7 +29,6 @@ def build_matches_view(
         return ft.Container(
             content=ft.Row(
                 controls=[
-                    # Avatar
                     ft.Container(
                         content=ft.Text(emoji, size=30),
                         width=54, height=54,
@@ -44,7 +37,6 @@ def build_matches_view(
                         border=ft.Border.all(2, T.LIKE_COLOR),
                         alignment=ft.Alignment(0, 0),
                     ),
-                    # Info
                     ft.Column(
                         controls=[
                             ft.Row(
@@ -68,6 +60,11 @@ def build_matches_view(
                                 ],
                                 spacing=8,
                             ),
+                            *([ft.Text(
+                                usuario.bio,
+                                size=11, color=T.MUTED,
+                                italic=True, no_wrap=False,
+                            )] if usuario.bio else []),
                             ft.Row(
                                 controls=[
                                     ft.Container(
@@ -106,7 +103,6 @@ def build_matches_view(
             padding=ft.Padding(14, 14, 14, 14),
         )
 
-    # ── Estado vazio ─────────────────────────────────────────
     if not matches:
         corpo = ft.Column(
             controls=[
@@ -133,7 +129,6 @@ def build_matches_view(
             scroll=ft.ScrollMode.AUTO,
         )
 
-    # ── Header ───────────────────────────────────────────────
     header = ft.Row(
         controls=[
             ft.IconButton(
@@ -148,7 +143,7 @@ def build_matches_view(
                 size=20, weight=ft.FontWeight.W_700,
                 color=T.TEXT, font_family=T.FONT_TITLE,
             ),
-            ft.Container(width=36),  # espaçador
+            ft.Container(width=36), 
         ],
         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
