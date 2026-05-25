@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass, field
 from typing import List
 
@@ -10,15 +9,15 @@ class User:
     nome: str
     interesses: List[str] = field(default_factory=list)
     bio: str = ""
+    score_risco: float = 0.25  # 0.0 = sem risco | 1.0 = alto risco (default: neutro-baixo)
 
     def calcular_afinidade(self, outro: "User") -> int:
-
         conjunto_a = set(i.lower() for i in self.interesses)
         conjunto_b = set(i.lower() for i in outro.interesses)
         return len(conjunto_a & conjunto_b)
 
     def __repr__(self) -> str:
-        return f"User(id={self.id}, nome='{self.nome}', interesses={self.interesses})"
+        return f"User(id={self.id}, nome='{self.nome}', risco={self.score_risco:.2f})"
 
     def __hash__(self):
         return hash(self.id)

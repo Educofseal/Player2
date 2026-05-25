@@ -1,9 +1,10 @@
 import json
 import os
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from src.core.user import User
 from src.core.graph import Graph
+from src.services.risk_service import calcular_score_risco
 
 
 INTERESSES_DISPONIVEIS = [
@@ -16,16 +17,16 @@ INTERESSES_DISPONIVEIS = [
 class RegistrationService:
 
     def __init__(self, grafo: Graph, caminho_json: Optional[str] = None):
-        self.grafo = grafo
-        self.caminho_json = caminho_json 
+        self.grafo        = grafo
+        self.caminho_json = caminho_json
 
     def proximo_id(self) -> int:
         ids = self.grafo.get_todos_ids()
         return max(ids) + 1 if ids else 1
 
     def validar(self, nome: str, interesses: List[str], bio: str = "") -> List[str]:
-      
         erros = []
+
         if not nome or not nome.strip():
             erros.append("O nome não pode ser vazio.")
         elif len(nome.strip()) < 2:
@@ -47,22 +48,46 @@ class RegistrationService:
 
         return erros
 
-    def cadastrar(self, nome: str, interesses: List[str], bio: str = "") -> User:
+    def cadastrar(
+        self,
+        nome: str,
+        interesses: List[str],
+        bio: str = "",
+        respostas_quiz: Optional[Dict[int, int]] = None,
+    ) -> User:
+        """
+        Cria e registra um novo usuário no grafo.
 
+        Parameters
+        ----------
+        nome            : nome de exibição
+        interesses      : lista de interesses selecionados
+        bio             : texto livre (opcional)
+        respostas_quiz  : dict {pergunta_id: score 1-5} do quiz de perfil.
+                          Se None, o score_risco é definido como 0.25 (padrão).
+        """
         erros = self.validar(nome, interesses, bio)
         if erros:
             raise ValueError(" | ".join(erros))
 
+        # ── Calcular score de risco ──────────────────────────────────────
+        if respostas_quiz:
+            resultado = calcular_score_risco(respostas_quiz)
+            score_risco = resultado["geral"]
+        else:
+            score_risco = 0.25  # default conservador
+
         novo_id = self.proximo_id()
         novo_usuario = User(
-            id=novo_id,
-            nome=nome.strip(),
-            interesses=[i.lower() for i in interesses],
-            bio=bio.strip(),
+            id          = novo_id,
+            nome        = nome.strip(),
+            interesses  = [i.lower() for i in interesses],
+            bio         = bio.strip(),
+            score_risco = score_risco,
         )
 
         self.grafo.adicionar_usuario(novo_usuario)
-        self.grafo.construir_arestas() 
+        self.grafo.construir_arestas()
 
         if self.caminho_json:
             self._persistir(novo_usuario)
@@ -78,13 +103,14 @@ class RegistrationService:
                 dados = {"usuarios": []}
 
             dados["usuarios"].append({
-                "id": usuario.id,
-                "nome": usuario.nome,
-                "interesses": usuario.interesses,
-                "bio": usuario.bio,
+                "id":          usuario.id,
+                "nome":        usuario.nome,
+                "interesses":  usuario.interesses,
+                "bio":         usuario.bio,
+                "score_risco": usuario.score_risco,
             })
 
             with open(self.caminho_json, "w", encoding="utf-8") as f:
                 json.dump(dados, f, ensure_ascii=False, indent=4)
         except Exception:
-            pass  
+            pass  # falha silenciosa — não bloqueia o cadastro

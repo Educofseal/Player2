@@ -1,15 +1,20 @@
-
 from typing import Dict, List, Tuple
 from src.core.user import User
 from src.core.edge import Edge
 
 
+# Peso adicional máximo aplicado quando dois usuários têm perfis de risco
+# completamente opostos (diff = 1.0). Aumenta o "custo" do caminho Dijkstra
+# entre eles, empurrando-os para o fim do feed um do outro.
+_FATOR_RISCO: float = 0.5
+
+
 class Graph:
 
     def __init__(self):
-        self._usuarios: Dict[int, User] = {}
+        self._usuarios:   Dict[int, User]                  = {}
         self._adjacencia: Dict[int, List[Tuple[int, float]]] = {}
-        self._arestas: List[Edge] = []
+        self._arestas:    List[Edge]                        = []
 
     def adicionar_usuario(self, usuario: User) -> None:
         self._usuarios[usuario.id] = usuario
@@ -17,9 +22,8 @@ class Graph:
             self._adjacencia[usuario.id] = []
 
     def construir_arestas(self) -> None:
-
         self._arestas.clear()
-        for uid, adj in self._adjacencia.items():
+        for adj in self._adjacencia.values():
             adj.clear()
 
         ids = list(self._usuarios.keys())
@@ -33,12 +37,24 @@ class Graph:
                 if em_comum == 0:
                     continue
 
-                peso = Edge.calcular_peso(em_comum)
-                aresta = Edge(u_a.id, u_b.id, em_comum, peso)
+                # Peso base: quanto mais interesses em comum, menor o peso
+                peso_base = Edge.calcular_peso(em_comum)
+
+                # Penalidade de risco: diferença entre os scores de risco dos dois
+                # usuários aumenta o custo da aresta. Perfis muito diferentes em risco
+                # ficam mais "distantes" no grafo → aparecem mais no fim do feed.
+                risco_diff = abs(u_a.score_risco - u_b.score_risco)
+                penalty    = round(risco_diff * _FATOR_RISCO, 4)
+
+                peso_final = round(peso_base + penalty, 4)
+
+                aresta = Edge(u_a.id, u_b.id, em_comum, peso_final)
                 self._arestas.append(aresta)
 
-                self._adjacencia[u_a.id].append((u_b.id, peso))
-                self._adjacencia[u_b.id].append((u_a.id, peso))
+                self._adjacencia[u_a.id].append((u_b.id, peso_final))
+                self._adjacencia[u_b.id].append((u_a.id, peso_final))
+
+    # ── Getters ─────────────────────────────────────────────────────────────
 
     def get_usuario(self, uid: int) -> User:
         return self._usuarios[uid]
@@ -65,4 +81,4 @@ class Graph:
         return (
             f"Graph(usuários={self.total_usuarios()}, "
             f"arestas={self.total_arestas()})"
-        ) 
+        )

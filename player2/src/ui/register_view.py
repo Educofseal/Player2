@@ -1,9 +1,14 @@
 import flet as ft
-from typing import Callable, List
+from typing import Callable, Dict, List
 
 from src.services.registration_service import RegistrationService, INTERESSES_DISPONIVEIS
+from src.services.risk_service import PERGUNTAS
 from src.core.user import User
 from src.ui import theme as T
+
+_TOTAL_PERGUNTAS = len(PERGUNTAS)   # 12
+_PASSOS_INICIAIS = 3                # nome, bio, interesses
+_TOTAL_PASSOS    = _PASSOS_INICIAIS + _TOTAL_PERGUNTAS  # 15
 
 
 def build_register_view(
@@ -12,209 +17,374 @@ def build_register_view(
     on_cadastro_ok: Callable[[User], None],
 ) -> ft.View:
 
+    # ── Estado (mutável em closures via lista) ───────────────────────────────
+    passo:      List[int] = [0]
+    nome_val:   List[str] = [""]
+    bio_val:    List[str] = [""]
     interesses_selecionados: List[str] = []
-    checkboxes: List[ft.Checkbox] = []
+    quiz_respostas: Dict[int, int]     = {}
 
-    nome_field    = ft.Ref[ft.TextField]()
-    bio_field     = ft.Ref[ft.TextField]()
-    erro_text     = ft.Ref[ft.Text]()
-    btn_cadastrar = ft.Ref[ft.ElevatedButton]()
-    contador_ref  = ft.Ref[ft.Text]()
+    # ── Refs ─────────────────────────────────────────────────────────────────
+    progresso_bar = ft.Ref[ft.ProgressBar]()
+    progresso_txt = ft.Ref[ft.Text]()
+    conteudo_ref  = ft.Ref[ft.Container]()
+    erro_ref      = ft.Ref[ft.Text]()
 
-    def on_interesse_change(e: ft.ControlEvent) -> None:
-        cb: ft.Checkbox = e.control
-        interesse = cb.data
-        if cb.value:
-            if interesse not in interesses_selecionados:
-                interesses_selecionados.append(interesse)
-        else:
-            if interesse in interesses_selecionados:
-                interesses_selecionados.remove(interesse)
+    # ── Helpers ──────────────────────────────────────────────────────────────
 
-        contador_ref.current.value = f"{len(interesses_selecionados)} selecionado(s)"
-        erro_text.current.value = ""
+    def _erro(msg: str) -> None:
+        erro_ref.current.value = msg
         page.update()
 
-    def on_cadastrar(e: ft.ControlEvent) -> None:
-        nome = nome_field.current.value or ""
-        erros = registration_service.validar(nome, interesses_selecionados)
+    def _avancar() -> None:
+        passo[0] += 1
+        _renderizar()
 
-        if erros:
-            erro_text.current.value = erros[0]
-            page.update()
-            return
-
-        try:
-            bio = bio_field.current.value or ""
-            novo_usuario = registration_service.cadastrar(nome, interesses_selecionados, bio)
-            on_cadastro_ok(novo_usuario)
-        except ValueError as ex:
-            erro_text.current.value = str(ex)
-            page.update()
-
-    def on_nome_change(e: ft.ControlEvent) -> None:
-        erro_text.current.value = ""
+    def _renderizar() -> None:
+        p = passo[0]
+        val = (p + 1) / _TOTAL_PASSOS
+        progresso_bar.current.value = min(val, 1.0)
+        progresso_txt.current.value = f"{min(p + 1, _TOTAL_PASSOS)}/{_TOTAL_PASSOS}"
+        erro_ref.current.value      = ""
+        conteudo_ref.current.content = _build_passo(p)
         page.update()
 
-    grid_interesses = ft.GridView(
-        expand=False,
-        runs_count=3,
-        max_extent=130,
-        child_aspect_ratio=2.8,
-        spacing=8,
-        run_spacing=8,
-    )
+    # ── Passo 0 — Nome ───────────────────────────────────────────────────────
 
-    for interesse in INTERESSES_DISPONIVEIS:
-        cb = ft.Checkbox(
-            label=interesse,
-            data=interesse,
-            value=False,
-            on_change=on_interesse_change,
-            fill_color={
-                ft.ControlState.SELECTED: T.ACCENT,
-                ft.ControlState.DEFAULT:  T.SURFACE3,
-            },
-            check_color=T.TEXT,
-            label_style=ft.TextStyle(
-                size=12,
-                color=T.TEXT,
-                font_family=T.FONT_MONO,
-            ),
+    def _passo_nome() -> ft.Column:
+        campo = ft.TextField(
+            value=nome_val[0],
+            hint_text="Digite seu nome...",
+            hint_style=ft.TextStyle(color=T.MUTED, size=18),
+            text_style=ft.TextStyle(color=T.TEXT, size=20, font_family=T.FONT_TITLE),
+            bgcolor="transparent",
+            border_color="transparent",
+            focused_border_color="transparent",
+            content_padding=ft.Padding(0, 8, 0, 8),
+            max_length=40,
+            cursor_color=T.ACCENT2,
+            autofocus=True,
         )
-        checkboxes.append(cb)
-        grid_interesses.controls.append(cb)
 
-    content = ft.Column(
-        controls=[
+        def _next(e: ft.ControlEvent) -> None:
+            v = (campo.value or "").strip()
+            if len(v) < 2:
+                _erro("Nome deve ter ao menos 2 caracteres.")
+                return
+            if len(v) > 40:
+                _erro("Nome deve ter no máximo 40 caracteres.")
+                return
+            nomes = [u.nome.lower() for u in registration_service.grafo.get_todos_usuarios()]
+            if v.lower() in nomes:
+                _erro(f"'{v}' já está em uso. Escolha outro nome.")
+                return
+            nome_val[0] = v
+            _avancar()
 
-            # Cabeçalho
+        return ft.Column([
+            ft.Text("Qual é o seu nome?", size=28, color=T.TEXT,
+                    weight=ft.FontWeight.W_700, font_family=T.FONT_TITLE),
+            ft.Text("Como você quer ser chamado na comunidade",
+                    size=13, color=T.MUTED),
+            ft.Container(height=32),
             ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Row(
-                            controls=[
-                                ft.Text(
-                                    "PLAYER", size=32, weight=ft.FontWeight.W_700,
-                                    color=T.NEON, font_family=T.FONT_TITLE,
-                                ),
-                                ft.Text(
-                                    "2", size=32, weight=ft.FontWeight.W_700,
-                                    color=T.ACCENT2, font_family=T.FONT_TITLE,
-                                ),
-                            ],
-                            spacing=0,
-                        ),
-                        ft.Text(
-                            "Crie seu perfil geek",
-                            size=13, color=T.MUTED,
-                        ),
-                    ],
-                    spacing=2,
-                ),
-                padding=ft.Padding(0, 0, 0, 20),
-            ),
-
-            ft.Text("Seu nome", size=12, color=T.MUTED, weight=ft.FontWeight.W_500),
-            ft.TextField(
-                ref=nome_field,
-                hint_text="Como você quer ser chamado?",
-                hint_style=ft.TextStyle(color=T.MUTED, size=14),
-                text_style=ft.TextStyle(color=T.TEXT, size=14),
+                content=campo,
                 bgcolor=T.SURFACE2,
-                border_color=T.BORDER,
-                focused_border_color=T.ACCENT,
-                border_radius=T.RADIUS,
-                content_padding=ft.Padding(16, 14, 16, 14),
-                on_change=on_nome_change,
-                max_length=40,
-                cursor_color=T.ACCENT2,
+                border=ft.Border(bottom=ft.BorderSide(2, T.ACCENT)),
+                border_radius=ft.BorderRadius(T.RADIUS, T.RADIUS, 0, 0),
+                padding=ft.Padding(20, 16, 20, 16),
             ),
-
-            ft.Container(height=4),
-
-            ft.Text("Sua bio", size=12, color=T.MUTED, weight=ft.FontWeight.W_500),
-            ft.TextField(
-                ref=bio_field,
-                hint_text="Uma frase sobre você (opcional, máx. 160 caracteres)",
-                hint_style=ft.TextStyle(color=T.MUTED, size=13),
-                text_style=ft.TextStyle(color=T.TEXT, size=13),
-                bgcolor=T.SURFACE2,
-                border_color=T.BORDER,
-                focused_border_color=T.ACCENT,
-                border_radius=T.RADIUS,
-                content_padding=ft.Padding(16, 14, 16, 14),
-                multiline=True,
-                min_lines=2,
-                max_lines=3,
-                max_length=160,
-                cursor_color=T.ACCENT2,
-            ),
-
-            ft.Container(height=4),
-            ft.Row(
-                controls=[
-                    ft.Text("Seus interesses", size=12, color=T.MUTED,
-                            weight=ft.FontWeight.W_500),
-                    ft.Text(
-                        ref=contador_ref,
-                        value="0 selecionado(s)",
-                        size=11, color=T.ACCENT2,
+            ft.Container(height=32),
+            ft.Row([
+                ft.ElevatedButton(
+                    content=ft.Text("Próximo →", size=16, weight=ft.FontWeight.W_600,
+                                    font_family=T.FONT_TITLE, color=T.TEXT),
+                    on_click=_next,
+                    style=ft.ButtonStyle(
+                        bgcolor={ft.ControlState.DEFAULT: T.ACCENT,
+                                 ft.ControlState.HOVERED: T.ACCENT2,
+                                 ft.ControlState.PRESSED: "#5b21b6"},
+                        shape=ft.RoundedRectangleBorder(radius=T.RADIUS),
+                        padding=ft.Padding(0, 18, 0, 18),
                     ),
-                ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            ),
+                    expand=True, height=52,
+                ),
+            ]),
+        ], spacing=8)
 
+    # ── Passo 1 — Bio ────────────────────────────────────────────────────────
+
+    def _passo_bio() -> ft.Column:
+        campo = ft.TextField(
+            value=bio_val[0],
+            hint_text="Uma frase sobre você...",
+            hint_style=ft.TextStyle(color=T.MUTED, size=16),
+            text_style=ft.TextStyle(color=T.TEXT, size=16),
+            bgcolor="transparent",
+            border_color="transparent",
+            focused_border_color="transparent",
+            content_padding=ft.Padding(0, 8, 0, 8),
+            multiline=True, min_lines=2, max_lines=4,
+            max_length=160,
+            cursor_color=T.ACCENT2,
+            autofocus=True,
+        )
+
+        def _next(e: ft.ControlEvent) -> None:
+            v = (campo.value or "").strip()
+            if len(v) > 160:
+                _erro("Bio deve ter no máximo 160 caracteres.")
+                return
+            bio_val[0] = v
+            _avancar()
+
+        def _pular(e: ft.ControlEvent) -> None:
+            bio_val[0] = ""
+            _avancar()
+
+        return ft.Column([
+            ft.Text("Sua bio", size=28, color=T.TEXT,
+                    weight=ft.FontWeight.W_700, font_family=T.FONT_TITLE),
+            ft.Text("Uma frase que te define — totalmente opcional",
+                    size=13, color=T.MUTED),
+            ft.Container(height=32),
             ft.Container(
-                content=grid_interesses,
+                content=campo,
+                bgcolor=T.SURFACE2,
+                border=ft.Border(bottom=ft.BorderSide(2, T.ACCENT)),
+                border_radius=ft.BorderRadius(T.RADIUS, T.RADIUS, 0, 0),
+                padding=ft.Padding(20, 16, 20, 16),
+            ),
+            ft.Container(height=32),
+            ft.Row([
+                ft.ElevatedButton(
+                    content=ft.Text("Próximo →", size=16, weight=ft.FontWeight.W_600,
+                                    font_family=T.FONT_TITLE, color=T.TEXT),
+                    on_click=_next,
+                    style=ft.ButtonStyle(
+                        bgcolor={ft.ControlState.DEFAULT: T.ACCENT,
+                                 ft.ControlState.HOVERED: T.ACCENT2,
+                                 ft.ControlState.PRESSED: "#5b21b6"},
+                        shape=ft.RoundedRectangleBorder(radius=T.RADIUS),
+                        padding=ft.Padding(0, 18, 0, 18),
+                    ),
+                    expand=True, height=52,
+                ),
+            ]),
+            ft.TextButton(
+                "Pular esta etapa",
+                on_click=_pular,
+                style=ft.ButtonStyle(color=T.MUTED),
+            ),
+        ], spacing=8, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
+
+    # ── Passo 2 — Interesses ─────────────────────────────────────────────────
+
+    def _passo_interesses() -> ft.Column:
+        contador = ft.Text(
+            f"{len(interesses_selecionados)} selecionado(s)",
+            size=12, color=T.ACCENT2,
+        )
+
+        grid = ft.GridView(
+            expand=False,
+            runs_count=3,
+            max_extent=130,
+            child_aspect_ratio=2.8,
+            spacing=8, run_spacing=8,
+        )
+
+        def _on_cb(e: ft.ControlEvent) -> None:
+            cb = e.control
+            if cb.value:
+                if cb.data not in interesses_selecionados:
+                    interesses_selecionados.append(cb.data)
+            else:
+                if cb.data in interesses_selecionados:
+                    interesses_selecionados.remove(cb.data)
+            contador.value = f"{len(interesses_selecionados)} selecionado(s)"
+            page.update()
+
+        for interesse in INTERESSES_DISPONIVEIS:
+            cb = ft.Checkbox(
+                label=interesse, data=interesse,
+                value=interesse in interesses_selecionados,
+                on_change=_on_cb,
+                fill_color={ft.ControlState.SELECTED: T.ACCENT,
+                            ft.ControlState.DEFAULT:  T.SURFACE3},
+                check_color=T.TEXT,
+                label_style=ft.TextStyle(size=12, color=T.TEXT, font_family=T.FONT_MONO),
+            )
+            grid.controls.append(cb)
+
+        def _next(e: ft.ControlEvent) -> None:
+            if len(interesses_selecionados) < 1:
+                _erro("Selecione ao menos 1 interesse.")
+                return
+            if len(interesses_selecionados) > 10:
+                _erro("Selecione no máximo 10 interesses.")
+                return
+            _avancar()
+
+        return ft.Column([
+            ft.Text("O que você curte?", size=28, color=T.TEXT,
+                    weight=ft.FontWeight.W_700, font_family=T.FONT_TITLE),
+            ft.Row([
+                ft.Text("Escolha seus interesses", size=13, color=T.MUTED),
+                contador,
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            ft.Container(height=12),
+            ft.Container(
+                content=grid,
                 bgcolor=T.SURFACE2,
                 border=ft.Border.all(1, T.BORDER),
                 border_radius=T.RADIUS,
                 padding=T.PADDING,
-                height=260,
+                height=270,
             ),
+            ft.Container(height=20),
+            ft.Row([
+                ft.ElevatedButton(
+                    content=ft.Text("Próximo →", size=16, weight=ft.FontWeight.W_600,
+                                    font_family=T.FONT_TITLE, color=T.TEXT),
+                    on_click=_next,
+                    style=ft.ButtonStyle(
+                        bgcolor={ft.ControlState.DEFAULT: T.ACCENT,
+                                 ft.ControlState.HOVERED: T.ACCENT2,
+                                 ft.ControlState.PRESSED: "#5b21b6"},
+                        shape=ft.RoundedRectangleBorder(radius=T.RADIUS),
+                        padding=ft.Padding(0, 18, 0, 18),
+                    ),
+                    expand=True, height=52,
+                ),
+            ]),
+        ], spacing=8)
 
-            ft.Container(height=4),
+    # ── Passos 3-14 — Quiz ───────────────────────────────────────────────────
 
+    def _passo_quiz(idx: int) -> ft.Column:
+        pergunta = PERGUNTAS[idx]
+        pid      = pergunta["id"]
+        eh_ultima = idx == _TOTAL_PERGUNTAS - 1
+        opcao_controls: List[ft.Container] = []
+
+        def _selecionar(e: ft.ControlEvent, score: int, idx_opcao: int) -> None:
+            # Registra resposta
+            quiz_respostas[pid] = score
+
+            # Feedback visual imediato
+            for i, c in enumerate(opcao_controls):
+                sel = (i == idx_opcao)
+                c.bgcolor = "#1e1040" if sel else T.SURFACE2
+                c.border  = ft.Border.all(1, T.ACCENT if sel else T.BORDER)
+                c.content.color = T.NEON if sel else T.TEXT
+            page.update()
+
+            # Avança para próxima pergunta ou finaliza
+            if eh_ultima:
+                _finalizar()
+            else:
+                _avancar()
+
+        for i, (texto_opcao, score) in enumerate(pergunta["opcoes"]):
+            def _handler(e, s=score, io=i):
+                _selecionar(e, s, io)
+
+            cont = ft.Container(
+                content=ft.Text(texto_opcao, size=13, color=T.TEXT,
+                                font_family=T.FONT_MONO),
+                bgcolor=T.SURFACE2,
+                border=ft.Border.all(1, T.BORDER),
+                border_radius=T.RADIUS,
+                padding=ft.Padding(18, 14, 18, 14),
+                on_click=_handler,
+            )
+            opcao_controls.append(cont)
+
+        num_label = ft.Container(
+            content=ft.Text(f"{idx + 1}/{_TOTAL_PERGUNTAS}", size=11,
+                            color=T.ACCENT2, font_family=T.FONT_MONO,
+                            weight=ft.FontWeight.W_600),
+            bgcolor=T.SURFACE3,
+            border_radius=20,
+            padding=ft.Padding(12, 5, 12, 5),
+        )
+
+        return ft.Column([
+            ft.Row([num_label]),
+            ft.Container(height=20),
             ft.Text(
-                ref=erro_text,
-                value="",
-                size=12,
-                color=T.NOPE_COLOR,
-                italic=True,
+                pergunta["texto"],
+                size=20,
+                color=T.TEXT,
+                weight=ft.FontWeight.W_600,
+                font_family=T.FONT_TITLE,
             ),
+            ft.Container(height=28),
+            ft.Column(opcao_controls, spacing=10),
+        ], spacing=0)
 
-            ft.ElevatedButton(
-                ref=btn_cadastrar,
-                content=ft.Text(
-                    "Criar meu perfil  →",
-                    size=15, weight=ft.FontWeight.W_600,
-                    font_family=T.FONT_TITLE, color=T.TEXT,
-                ),
-                on_click=on_cadastrar,
-                style=ft.ButtonStyle(
-                    bgcolor={
-                        ft.ControlState.DEFAULT:  T.ACCENT,
-                        ft.ControlState.HOVERED:  T.ACCENT2,
-                        ft.ControlState.PRESSED:  "#5b21b6",
-                    },
-                    color=T.TEXT,
-                    shape=ft.RoundedRectangleBorder(radius=T.RADIUS),
-                    padding=ft.Padding(0, 16, 0, 16),
-                ),
-                expand=True,
-                height=52,
-            ),
+    # ── Finalizar ────────────────────────────────────────────────────────────
 
-        ],
-        spacing=10,
-        scroll=ft.ScrollMode.AUTO,
-    )
+    def _finalizar() -> None:
+        try:
+            novo = registration_service.cadastrar(
+                nome           = nome_val[0],
+                interesses     = interesses_selecionados,
+                bio            = bio_val[0],
+                respostas_quiz = quiz_respostas,
+            )
+            on_cadastro_ok(novo)
+        except ValueError as ex:
+            _erro(str(ex))
+
+    # ── Dispatcher ───────────────────────────────────────────────────────────
+
+    def _build_passo(p: int) -> ft.Column:
+        if p == 0:   return _passo_nome()
+        if p == 1:   return _passo_bio()
+        if p == 2:   return _passo_interesses()
+        return _passo_quiz(p - _PASSOS_INICIAIS)
+
+    # ── Layout fixo ──────────────────────────────────────────────────────────
+
+    header = ft.Column([
+        ft.Row([
+            ft.Text("PLAYER", size=22, weight=ft.FontWeight.W_700,
+                    color=T.NEON, font_family=T.FONT_TITLE),
+            ft.Text("2", size=22, weight=ft.FontWeight.W_700,
+                    color=T.ACCENT2, font_family=T.FONT_TITLE),
+            ft.Container(expand=True),
+            ft.Text(ref=progresso_txt, value=f"1/{_TOTAL_PASSOS}",
+                    size=11, color=T.MUTED, font_family=T.FONT_MONO),
+        ], spacing=0),
+        ft.Container(height=10),
+        ft.ProgressBar(
+            ref=progresso_bar,
+            value=1 / _TOTAL_PASSOS,
+            color=T.ACCENT,
+            bgcolor=T.SURFACE3,
+            height=4,
+            border_radius=4,
+        ),
+    ], spacing=0)
 
     return ft.View(
         route="/register",
         bgcolor=T.BG,
-        padding=ft.Padding(24, 20, 24, 20),
-        controls=[content],
-        scroll=ft.ScrollMode.AUTO,
+        padding=ft.Padding(24, 36, 24, 24),
+        controls=[
+            ft.Column([
+                header,
+                ft.Container(height=36),
+                ft.Container(
+                    ref=conteudo_ref,
+                    content=_build_passo(0),
+                    expand=True,
+                ),
+                ft.Container(height=8),
+                ft.Text(ref=erro_ref, value="", size=12,
+                        color=T.NOPE_COLOR, italic=True),
+            ], expand=True, spacing=0),
+        ],
     )

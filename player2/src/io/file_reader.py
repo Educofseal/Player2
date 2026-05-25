@@ -1,4 +1,3 @@
-
 import json
 import os
 from typing import List
@@ -21,10 +20,11 @@ def carregar_usuarios_json(caminho: str) -> List[User]:
     for item in dados["usuarios"]:
         try:
             usuario = User(
-                id=int(item["id"]),
-                nome=str(item["nome"]),
-                interesses=[str(i).lower() for i in item.get("interesses", [])],
-                bio=str(item.get("bio", "")),
+                id          = int(item["id"]),
+                nome        = str(item["nome"]),
+                interesses  = [str(i).lower() for i in item.get("interesses", [])],
+                bio         = str(item.get("bio", "")),
+                score_risco = float(item.get("score_risco", 0.25)),
             )
             usuarios.append(usuario)
         except KeyError as e:
@@ -38,10 +38,11 @@ def carregar_usuarios_dict(dados: dict) -> List[User]:
     usuarios = []
     for item in dados.get("usuarios", []):
         usuario = User(
-            id=int(item["id"]),
-            nome=str(item["nome"]),
-            interesses=[str(i).lower() for i in item.get("interesses", [])],
-            bio=str(item.get("bio", "")),
+            id          = int(item["id"]),
+            nome        = str(item["nome"]),
+            interesses  = [str(i).lower() for i in item.get("interesses", [])],
+            bio         = str(item.get("bio", "")),
+            score_risco = float(item.get("score_risco", 0.25)),
         )
         usuarios.append(usuario)
     return usuarios
