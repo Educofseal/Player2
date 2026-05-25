@@ -1,37 +1,6 @@
-"""
-risk_service.py
----------------
-Triagem silenciosa de segurança baseada no Short Dark Tetrad (SD4 — Paulhus et al., 2021).
-
-As perguntas são apresentadas ao usuário como "Seu Estilo de Jogo" — uma curadoria
-de preferências geek — sem revelar o propósito clínico. O score resultante é usado
-apenas internamente pelo algoritmo de recomendação para evitar matches entre perfis
-de alto risco e perfis mais vulneráveis/abertos.
-
-Dimensões avaliadas (subclinical):
-  • Maquiavelismo  — manipulação planejada para ganho próprio
-  • Narcisismo      — senso de superioridade e merecimento
-  • Psicopatia      — frieza emocional, falta de empatia
-  • Sadismo         — prazer com o sofrimento ou humilhação alheia
-
-Referência: Paulhus, D. L., Buckels, E. E., Trapnell, P. D., & Jones, D. N. (2021).
-Screening for dark personalities: The Short Dark Tetrad (SD4).
-European Journal of Psychological Assessment.
-"""
 
 from typing import Dict, List
 
-# ── Banco de perguntas ──────────────────────────────────────────────────────
-#
-# Cada item tem:
-#   id        → índice único (0–11)
-#   dimensao  → qual dos 4 traços ele avalia
-#   texto     → pergunta exibida ao usuário (linguagem geek/neutra)
-#   opcoes    → lista de (texto_opcao, score_1_a_5)
-#               score 1 = traço ausente / score 5 = traço muito presente
-#
-# A ordem das opções foi embaralhada propositalmente para que a opção
-# de menor risco não seja sempre a primeira (reduz viés de resposta).
 
 PERGUNTAS: List[dict] = [
 
@@ -177,22 +146,8 @@ PERGUNTAS: List[dict] = [
 ]
 
 
-# ── Scoring ─────────────────────────────────────────────────────────────────
-
 def calcular_score_risco(respostas: Dict[int, int]) -> Dict:
-    """
-    Calcula o perfil de risco a partir das respostas ao quiz.
 
-    Parâmetros
-    ----------
-    respostas : dict {pergunta_id: score (1–5)}
-
-    Retorna
-    -------
-    dict com:
-        "dimensoes" → {"maquiavelismo": 0.0–1.0, "narcisismo": ..., ...}
-        "geral"     → float 0.0–1.0  (média das 4 dimensões)
-    """
     acumulado: Dict[str, List[int]] = {
         "maquiavelismo": [],
         "narcisismo":    [],
@@ -209,10 +164,9 @@ def calcular_score_risco(respostas: Dict[int, int]) -> Dict:
     for dim, valores in acumulado.items():
         if valores:
             media = sum(valores) / len(valores)
-            # Normaliza escala 1–5 para 0.0–1.0
             scores_dim[dim] = round((media - 1) / 4, 3)
         else:
-            scores_dim[dim] = 0.25  # default conservador (neutro-baixo)
+            scores_dim[dim] = 0.25
 
     geral = round(sum(scores_dim.values()) / len(scores_dim), 3)
 
@@ -220,7 +174,6 @@ def calcular_score_risco(respostas: Dict[int, int]) -> Dict:
 
 
 def classificar_risco(score: float) -> str:
-    """Rótulo interno para logs e debug. Nunca exibido ao usuário."""
     if score < 0.30:
         return "baixo"
     if score < 0.55:

@@ -9,7 +9,7 @@ class User:
     nome: str
     interesses: List[str] = field(default_factory=list)
     bio: str = ""
-    score_risco: float = 0.25  # 0.0 = sem risco | 1.0 = alto risco (default: neutro-baixo)
+    score_risco: float = 0.25 
 
     def calcular_afinidade(self, outro: "User") -> int:
         conjunto_a = set(i.lower() for i in self.interesses)

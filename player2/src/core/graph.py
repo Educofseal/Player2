@@ -2,10 +2,6 @@ from typing import Dict, List, Tuple
 from src.core.user import User
 from src.core.edge import Edge
 
-
-# Peso adicional máximo aplicado quando dois usuários têm perfis de risco
-# completamente opostos (diff = 1.0). Aumenta o "custo" do caminho Dijkstra
-# entre eles, empurrando-os para o fim do feed um do outro.
 _FATOR_RISCO: float = 0.5
 
 
@@ -37,12 +33,8 @@ class Graph:
                 if em_comum == 0:
                     continue
 
-                # Peso base: quanto mais interesses em comum, menor o peso
                 peso_base = Edge.calcular_peso(em_comum)
 
-                # Penalidade de risco: diferença entre os scores de risco dos dois
-                # usuários aumenta o custo da aresta. Perfis muito diferentes em risco
-                # ficam mais "distantes" no grafo → aparecem mais no fim do feed.
                 risco_diff = abs(u_a.score_risco - u_b.score_risco)
                 penalty    = round(risco_diff * _FATOR_RISCO, 4)
 
@@ -53,8 +45,6 @@ class Graph:
 
                 self._adjacencia[u_a.id].append((u_b.id, peso_final))
                 self._adjacencia[u_b.id].append((u_a.id, peso_final))
-
-    # ── Getters ─────────────────────────────────────────────────────────────
 
     def get_usuario(self, uid: int) -> User:
         return self._usuarios[uid]

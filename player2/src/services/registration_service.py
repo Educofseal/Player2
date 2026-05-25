@@ -55,27 +55,16 @@ class RegistrationService:
         bio: str = "",
         respostas_quiz: Optional[Dict[int, int]] = None,
     ) -> User:
-        """
-        Cria e registra um novo usuário no grafo.
 
-        Parameters
-        ----------
-        nome            : nome de exibição
-        interesses      : lista de interesses selecionados
-        bio             : texto livre (opcional)
-        respostas_quiz  : dict {pergunta_id: score 1-5} do quiz de perfil.
-                          Se None, o score_risco é definido como 0.25 (padrão).
-        """
         erros = self.validar(nome, interesses, bio)
         if erros:
             raise ValueError(" | ".join(erros))
 
-        # ── Calcular score de risco ──────────────────────────────────────
         if respostas_quiz:
             resultado = calcular_score_risco(respostas_quiz)
             score_risco = resultado["geral"]
         else:
-            score_risco = 0.25  # default conservador
+            score_risco = 0.25
 
         novo_id = self.proximo_id()
         novo_usuario = User(
@@ -113,4 +102,4 @@ class RegistrationService:
             with open(self.caminho_json, "w", encoding="utf-8") as f:
                 json.dump(dados, f, ensure_ascii=False, indent=4)
         except Exception:
-            pass  # falha silenciosa — não bloqueia o cadastro
+            pass 

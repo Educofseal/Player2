@@ -6,9 +6,9 @@ from src.services.risk_service import PERGUNTAS
 from src.core.user import User
 from src.ui import theme as T
 
-_TOTAL_PERGUNTAS = len(PERGUNTAS)   # 12
-_PASSOS_INICIAIS = 3                # nome, bio, interesses
-_TOTAL_PASSOS    = _PASSOS_INICIAIS + _TOTAL_PERGUNTAS  # 15
+_TOTAL_PERGUNTAS = len(PERGUNTAS)  
+_PASSOS_INICIAIS = 3               
+_TOTAL_PASSOS    = _PASSOS_INICIAIS + _TOTAL_PERGUNTAS 
 
 
 def build_register_view(
@@ -17,20 +17,16 @@ def build_register_view(
     on_cadastro_ok: Callable[[User], None],
 ) -> ft.View:
 
-    # ── Estado (mutável em closures via lista) ───────────────────────────────
     passo:      List[int] = [0]
     nome_val:   List[str] = [""]
     bio_val:    List[str] = [""]
     interesses_selecionados: List[str] = []
     quiz_respostas: Dict[int, int]     = {}
 
-    # ── Refs ─────────────────────────────────────────────────────────────────
     progresso_bar = ft.Ref[ft.ProgressBar]()
     progresso_txt = ft.Ref[ft.Text]()
     conteudo_ref  = ft.Ref[ft.Container]()
     erro_ref      = ft.Ref[ft.Text]()
-
-    # ── Helpers ──────────────────────────────────────────────────────────────
 
     def _erro(msg: str) -> None:
         erro_ref.current.value = msg
@@ -48,8 +44,6 @@ def build_register_view(
         erro_ref.current.value      = ""
         conteudo_ref.current.content = _build_passo(p)
         page.update()
-
-    # ── Passo 0 — Nome ───────────────────────────────────────────────────────
 
     def _passo_nome() -> ft.Column:
         campo = ft.TextField(
@@ -111,8 +105,6 @@ def build_register_view(
                 ),
             ]),
         ], spacing=8)
-
-    # ── Passo 1 — Bio ────────────────────────────────────────────────────────
 
     def _passo_bio() -> ft.Column:
         campo = ft.TextField(
@@ -177,8 +169,6 @@ def build_register_view(
                 style=ft.ButtonStyle(color=T.MUTED),
             ),
         ], spacing=8, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
-
-    # ── Passo 2 — Interesses ─────────────────────────────────────────────────
 
     def _passo_interesses() -> ft.Column:
         contador = ft.Text(
@@ -260,8 +250,6 @@ def build_register_view(
             ]),
         ], spacing=8)
 
-    # ── Passos 3-14 — Quiz ───────────────────────────────────────────────────
-
     def _passo_quiz(idx: int) -> ft.Column:
         pergunta = PERGUNTAS[idx]
         pid      = pergunta["id"]
@@ -269,10 +257,8 @@ def build_register_view(
         opcao_controls: List[ft.Container] = []
 
         def _selecionar(e: ft.ControlEvent, score: int, idx_opcao: int) -> None:
-            # Registra resposta
             quiz_respostas[pid] = score
 
-            # Feedback visual imediato
             for i, c in enumerate(opcao_controls):
                 sel = (i == idx_opcao)
                 c.bgcolor = "#1e1040" if sel else T.SURFACE2
@@ -280,7 +266,6 @@ def build_register_view(
                 c.content.color = T.NEON if sel else T.TEXT
             page.update()
 
-            # Avança para próxima pergunta ou finaliza
             if eh_ultima:
                 _finalizar()
             else:
@@ -324,8 +309,6 @@ def build_register_view(
             ft.Column(opcao_controls, spacing=10),
         ], spacing=0)
 
-    # ── Finalizar ────────────────────────────────────────────────────────────
-
     def _finalizar() -> None:
         try:
             novo = registration_service.cadastrar(
@@ -338,15 +321,11 @@ def build_register_view(
         except ValueError as ex:
             _erro(str(ex))
 
-    # ── Dispatcher ───────────────────────────────────────────────────────────
-
     def _build_passo(p: int) -> ft.Column:
         if p == 0:   return _passo_nome()
         if p == 1:   return _passo_bio()
         if p == 2:   return _passo_interesses()
         return _passo_quiz(p - _PASSOS_INICIAIS)
-
-    # ── Layout fixo ──────────────────────────────────────────────────────────
 
     header = ft.Column([
         ft.Row([
