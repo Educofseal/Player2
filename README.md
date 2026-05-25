@@ -20,6 +20,57 @@ O card de cada perfil mostra o **caminho Dijkstra** percorrido até aquela pesso
 
 ---
 
+## Sistema de segurança — Triagem de Perfil 🛡️
+
+O público geek tende a ser mais aberto, confiante e acessível socialmente — qualidades ótimas para formar comunidades, mas que também podem atrair usuários oportunistas. Para mitigar isso, o Player2 inclui um sistema silencioso de triagem comportamental integrado ao cadastro.
+
+### Como funciona
+
+Durante o cadastro, após escolher nome, bio e interesses, o usuário responde **12 perguntas** apresentadas como *"Seu Estilo — como você se comporta nas comunidades geek"*. As perguntas parecem uma curadoria de preferências de jogo e convivência. O usuário não sabe que está sendo avaliado.
+
+Por baixo, cada resposta é mapeada para uma das quatro dimensões do **Short Dark Tetrad (SD4)**, escala psicométrica desenvolvida por Paulhus et al. (2021):
+
+| Dimensão | O que avalia |
+|---|---|
+| **Maquiavelismo** | Tendência à manipulação planejada para ganho próprio |
+| **Narcisismo** | Senso de superioridade e merecimento excessivo |
+| **Psicopatia** | Frieza emocional, falta de empatia |
+| **Sadismo** | Prazer com o sofrimento ou humilhação alheia |
+
+Cada resposta tem um score de 1 a 5. A média normalizada das quatro dimensões gera um `score_risco` entre 0.0 e 1.0 salvo no perfil do usuário.
+
+### Como o score afeta o feed
+
+O `score_risco` é usado diretamente na construção do grafo. A fórmula de peso das arestas foi estendida:
+
+```
+peso_final = 1 / (1 + interesses_em_comum) + |risco_A - risco_B| × 0.5
+```
+
+Quanto maior a diferença de risco entre dois usuários, **mais pesada fica a aresta** entre eles. Como o Dijkstra ordena o feed pelo menor custo, perfis com scores de risco muito diferentes do seu aparecem naturalmente no final da fila — sem banimento, sem aviso, sem exposição do score.
+
+```
+risco_A = 0.05  │  risco_B = 0.08  →  peso = 0.35  ✓ aparecem cedo um para o outro
+risco_A = 0.05  │  risco_C = 0.90  →  peso = 0.76  ✗ aparecem tarde um para o outro
+```
+
+### O que o usuário vê
+
+Nada relacionado ao score. A triagem é completamente silenciosa:
+
+- As perguntas têm linguagem neutra e geek, sem termos psicológicos.
+- As opções de cada pergunta estão em ordem embaralhada, dificultando identificar a "resposta certa".
+- O `score_risco` nunca é exibido na interface.
+- Não há bloqueio ou rejeição de cadastro por score alto — apenas reordenação do feed.
+
+### Referência
+
+> Paulhus, D. L., Buckels, E. E., Trapnell, P. D., & Jones, D. N. (2021).
+> *Screening for dark personalities: The Short Dark Tetrad (SD4).*
+> European Journal of Psychological Assessment.
+
+---
+
 ## Stack
 
 | Camada | Tecnologia |
@@ -27,6 +78,7 @@ O card de cada perfil mostra o **caminho Dijkstra** percorrido até aquela pesso
 | Interface | [Flet](https://flet.dev) (Flutter via Python) |
 | Linguagem | Python 3.9+ |
 | Algoritmos | Dijkstra, BFS, DFS — implementados do zero |
+| Triagem | Short Dark Tetrad (SD4) adaptado |
 | Persistência | JSON flat-file |
 | Dependências | `flet >= 0.21.0` |
 
@@ -40,21 +92,22 @@ player2/
 └── src/
     ├── main.py                     ← entry point + router Flet
     ├── core/
-    │   ├── user.py                 ← entidade User (dataclass)
+    │   ├── user.py                 ← entidade User (dataclass + score_risco)
     │   ├── edge.py                 ← aresta ponderada
-    │   └── graph.py                ← grafo lista de adjacência
+    │   └── graph.py                ← grafo com penalidade de risco nas arestas
     ├── algorithms/
     │   ├── dijkstra.py             ← menor caminho = maior afinidade
     │   ├── bfs.py                  ← graus de separação
     │   └── dfs.py                  ← exploração + componentes
     ├── services/
     │   ├── recommendation_service.py  ← orquestra os algoritmos
-    │   └── registration_service.py    ← cadastro e validação
+    │   ├── registration_service.py    ← cadastro, validação e score de risco
+    │   └── risk_service.py            ← perguntas SD4 + cálculo do score_risco
     ├── io/
     │   └── file_reader.py          ← parsing e persistência JSON
     └── ui/
         ├── theme.py                ← design system (cores, fontes, helpers)
-        ├── register_view.py        ← tela de cadastro
+        ├── register_view.py        ← cadastro em 15 passos (wizard step-by-step)
         ├── swipe_view.py           ← feed de cards + ações
         └── matches_view.py         ← lista de matches
 ```
@@ -69,9 +122,9 @@ player2/
                   └───────────────┘
 ```
 
-1. **/register** — Você escolhe seu nome, escreve uma bio e seleciona seus interesses. O `RegistrationService` valida, cria o `User` e reconstrói as arestas do grafo.
+1. **/register** — Wizard de 15 passos: nome → bio → interesses → 12 perguntas de perfil. Cada etapa ocupa a tela inteira. Ao responder a última pergunta, o cadastro é finalizado automaticamente.
 
-2. **/swipe** — Feed de perfis ordenado pelo Dijkstra. Cada card mostra afinidade em %, interesses em comum (verde) e únicos do outro usuário (roxo), além do caminho no grafo até aquela pessoa.
+2. **/swipe** — Feed de perfis ordenado pelo Dijkstra (com penalidade de risco). Cada card mostra afinidade em %, interesses em comum (verde) e únicos do outro usuário (roxo), além do caminho no grafo até aquela pessoa.
    - 💜 **Like** — registra o match
    - ✕ **Pass** — próximo perfil
    - ↩ **Undo** — desfaz o último swipe
@@ -109,13 +162,14 @@ Usuários são armazenados em `usuarios.json`:
       "id": 1,
       "nome": "João",
       "interesses": ["anime", "jogos", "rpg", "mangá"],
-      "bio": "Mestre de RPG nas noites de sexta 🧙"
+      "bio": "Mestre de RPG nas noites de sexta 🧙",
+      "score_risco": 0.10
     }
   ]
 }
 ```
 
-O peso de cada aresta é calculado como `1 / (1 + interesses_em_comum)`, garantindo que maior afinidade = menor custo no Dijkstra.
+O peso de cada aresta é calculado como `1 / (1 + interesses_em_comum) + penalidade_de_risco`, garantindo que maior afinidade = menor custo no Dijkstra, e que perfis com scores de risco muito diferentes fiquem mais distantes no grafo.
 
 ---
 
