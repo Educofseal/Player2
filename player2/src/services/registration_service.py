@@ -1,10 +1,9 @@
 import json
 import os
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from src.core.user import User
 from src.core.graph import Graph
-from src.services.risk_service import calcular_score_risco
 
 
 INTERESSES_DISPONIVEIS = [
@@ -53,18 +52,11 @@ class RegistrationService:
         nome: str,
         interesses: List[str],
         bio: str = "",
-        respostas_quiz: Optional[Dict[int, int]] = None,
     ) -> User:
 
         erros = self.validar(nome, interesses, bio)
         if erros:
             raise ValueError(" | ".join(erros))
-
-        if respostas_quiz:
-            resultado = calcular_score_risco(respostas_quiz)
-            score_risco = resultado["geral"]
-        else:
-            score_risco = 0.25
 
         novo_id = self.proximo_id()
         novo_usuario = User(
@@ -72,7 +64,6 @@ class RegistrationService:
             nome        = nome.strip(),
             interesses  = [i.lower() for i in interesses],
             bio         = bio.strip(),
-            score_risco = score_risco,
         )
 
         self.grafo.adicionar_usuario(novo_usuario)
@@ -96,7 +87,6 @@ class RegistrationService:
                 "nome":        usuario.nome,
                 "interesses":  usuario.interesses,
                 "bio":         usuario.bio,
-                "score_risco": usuario.score_risco,
             })
 
             with open(self.caminho_json, "w", encoding="utf-8") as f:

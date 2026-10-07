@@ -2,8 +2,6 @@ from typing import Dict, List, Tuple
 from src.core.user import User
 from src.core.edge import Edge
 
-_FATOR_RISCO: float = 0.5
-
 
 class Graph:
 
@@ -33,12 +31,7 @@ class Graph:
                 if em_comum == 0:
                     continue
 
-                peso_base = Edge.calcular_peso(em_comum)
-
-                risco_diff = abs(u_a.score_risco - u_b.score_risco)
-                penalty    = round(risco_diff * _FATOR_RISCO, 4)
-
-                peso_final = round(peso_base + penalty, 4)
+                peso_final = Edge.calcular_peso(em_comum)
 
                 aresta = Edge(u_a.id, u_b.id, em_comum, peso_final)
                 self._arestas.append(aresta)
