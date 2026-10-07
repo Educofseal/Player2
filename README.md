@@ -1,31 +1,46 @@
-Player2 🎮
+# Player2 🎮
 
-Encontre seu player 2: o app de matchmaking geek feito com grafos.
+> *Encontre seu player 2: o app de matchmaking geek feito com grafos.*
 
 Interface estilo Tinder para conectar pessoas por interesses em comum, como anime, RPG, jogos, k-pop e programação. Por baixo dos cards e dos likes, roda um sistema de grafos com Dijkstra, BFS e DFS que decide quem você deveria conhecer.
 
-Como funciona
+<!-- Coloque aqui um GIF ou print do feed de swipe -->
 
-O app modela os usuários como nós de um grafo ponderado. Cada aresta conecta dois usuários e tem peso inversamente proporcional ao número de interesses em comum: quanto mais afinidade, menor o custo da aresta.
+---
 
+## Como funciona
+
+O app modela os usuários como **nós de um grafo ponderado**. Cada aresta conecta dois usuários e tem peso inversamente proporcional ao número de interesses em comum: quanto mais afinidade, menor o custo da aresta.
+
+```
 peso = 1 / (1 + interesses_em_comum)
+```
 
 A partir desse grafo, três algoritmos entram em cena:
 
-Dijkstra ordena os perfis no feed pelo menor custo de caminho até você. Os mais compatíveis aparecem primeiro.
-BFS calcula o grau de separação entre usuários (distância em níveis no grafo).
-DFS explora componentes conectados e descobre grupos de afinidade.
+- **Dijkstra** ordena os perfis no feed pelo menor custo de caminho até você. Os mais compatíveis aparecem primeiro.
+- **BFS** calcula o grau de separação entre usuários (distância em níveis no grafo).
+- **DFS** explora componentes conectados e descobre grupos de afinidade.
 
-O card de cada perfil mostra o caminho Dijkstra percorrido até aquela pessoa e o custo da conexão, para o usuário entender por que o app recomendou aquele match.
+O card de cada perfil mostra o **caminho Dijkstra** percorrido até aquela pessoa e o custo da conexão, para o usuário entender por que o app recomendou aquele match.
 
-Stack
-Camada	Tecnologia
-Interface	Flet (Flutter via Python)
-Linguagem	Python 3.9+
-Algoritmos	Dijkstra, BFS e DFS implementados do zero
-Persistência	JSON flat-file
-Dependências	flet >= 0.21.0
-Estrutura
+---
+
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Interface | [Flet](https://flet.dev) (Flutter via Python) |
+| Linguagem | Python 3.9+ |
+| Algoritmos | Dijkstra, BFS e DFS implementados do zero |
+| Persistência | JSON flat-file |
+| Dependências | `flet >= 0.21.0` |
+
+---
+
+## Estrutura
+
+```
 player2/
 ├── usuarios.json                   ← base de dados de usuários
 └── src/
@@ -48,19 +63,33 @@ player2/
         ├── register_view.py        ← cadastro passo a passo
         ├── swipe_view.py           ← feed de cards + ações
         └── matches_view.py         ← lista de matches
-Fluxo da interface
+```
+
+---
+
+## Fluxo da interface
+
+```
 /register  ──►  /swipe  ──►  /matches
                   ▲               │
                   └───────────────┘
-/register: wizard passo a passo com nome, bio e interesses. Cada etapa ocupa a tela inteira.
-/swipe: feed de perfis ordenado pelo Dijkstra. Cada card mostra afinidade em %, interesses em comum (verde) e únicos do outro usuário (roxo), além do caminho no grafo até aquela pessoa.
-💜 Like: registra o match
-✕ Pass: próximo perfil
-↩ Undo: desfaz o último swipe
-⭐ Super: like especial
-/matches: lista todos os perfis curtidos com bio, interesses em comum e custo Dijkstra. O estado persiste ao navegar entre as telas.
-Como rodar
-bash
+```
+
+1. **/register**: wizard passo a passo com nome, bio e interesses. Cada etapa ocupa a tela inteira.
+
+2. **/swipe**: feed de perfis ordenado pelo Dijkstra. Cada card mostra afinidade em %, interesses em comum (verde) e únicos do outro usuário (roxo), além do caminho no grafo até aquela pessoa.
+   - 💜 **Like**: registra o match
+   - ✕ **Pass**: próximo perfil
+   - ↩ **Undo**: desfaz o último swipe
+   - ⭐ **Super**: like especial
+
+3. **/matches**: lista todos os perfis curtidos com bio, interesses em comum e custo Dijkstra. O estado persiste ao navegar entre as telas.
+
+---
+
+## Como rodar
+
+```bash
 # Instalar dependências
 pip install -r requirements.txt
 
@@ -69,14 +98,17 @@ python -m src.main
 
 # Rodar no browser
 flet run --web src/main.py
+```
 
-A janela abre em 430 × 820 px (proporção mobile).
+A janela abre em **430 × 820 px** (proporção mobile).
 
-Modelo de dados
+---
 
-Usuários são armazenados em usuarios.json:
+## Modelo de dados
 
-json
+Usuários são armazenados em `usuarios.json`:
+
+```json
 {
   "usuarios": [
     {
@@ -87,12 +119,12 @@ json
     }
   ]
 }
+```
 
-O peso de cada aresta é 1 / (1 + interesses_em_comum), garantindo que maior afinidade signifique menor custo no Dijkstra.
+O peso de cada aresta é `1 / (1 + interesses_em_comum)`, garantindo que maior afinidade signifique menor custo no Dijkstra.
 
-Contexto acadêmico
+---
 
-Projeto desenvolvido para a disciplina de Estruturas de Dados e Algoritmos em Grafos, com o objetivo de aplicar algoritmos clássicos de grafos em um produto com interface real. A escolha do Flet permitiu entregar uma UI mobile-first sem sair do ecossistema Python.
 ## Contexto acadêmico
 
 Projeto desenvolvido para a disciplina de **Estruturas de Dados e Algoritmos em Grafos**, com o objetivo de aplicar algoritmos clássicos de grafos em um produto com interface real. A escolha do Flet permitiu entregar uma UI mobile-first sem sair do ecossistema Python.
