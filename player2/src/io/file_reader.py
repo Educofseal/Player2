@@ -24,7 +24,6 @@ def carregar_usuarios_json(caminho: str) -> List[User]:
                 nome        = str(item["nome"]),
                 interesses  = [str(i).lower() for i in item.get("interesses", [])],
                 bio         = str(item.get("bio", "")),
-                score_risco = float(item.get("score_risco", 0.25)),
             )
             usuarios.append(usuario)
         except KeyError as e:
@@ -42,7 +41,6 @@ def carregar_usuarios_dict(dados: dict) -> List[User]:
             nome        = str(item["nome"]),
             interesses  = [str(i).lower() for i in item.get("interesses", [])],
             bio         = str(item.get("bio", "")),
-            score_risco = float(item.get("score_risco", 0.25)),
         )
         usuarios.append(usuario)
     return usuarios

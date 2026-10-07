@@ -9,7 +9,6 @@ class User:
     nome: str
     interesses: List[str] = field(default_factory=list)
     bio: str = ""
-    score_risco: float = 0.25 
 
     def calcular_afinidade(self, outro: "User") -> int:
         conjunto_a = set(i.lower() for i in self.interesses)
@@ -17,7 +16,7 @@ class User:
         return len(conjunto_a & conjunto_b)
 
     def __repr__(self) -> str:
-        return f"User(id={self.id}, nome='{self.nome}', risco={self.score_risco:.2f})"
+        return f"User(id={self.id}, nome='{self.nome}')"
 
     def __hash__(self):
         return hash(self.id)

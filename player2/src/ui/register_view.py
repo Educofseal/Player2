@@ -1,14 +1,11 @@
 import flet as ft
-from typing import Callable, Dict, List
+from typing import Callable, List
 
 from src.services.registration_service import RegistrationService, INTERESSES_DISPONIVEIS
-from src.services.risk_service import PERGUNTAS
 from src.core.user import User
 from src.ui import theme as T
 
-_TOTAL_PERGUNTAS = len(PERGUNTAS)  
-_PASSOS_INICIAIS = 3               
-_TOTAL_PASSOS    = _PASSOS_INICIAIS + _TOTAL_PERGUNTAS 
+_TOTAL_PASSOS = 3
 
 
 def build_register_view(
@@ -21,7 +18,6 @@ def build_register_view(
     nome_val:   List[str] = [""]
     bio_val:    List[str] = [""]
     interesses_selecionados: List[str] = []
-    quiz_respostas: Dict[int, int]     = {}
 
     progresso_bar = ft.Ref[ft.ProgressBar]()
     progresso_txt = ft.Ref[ft.Text]()
@@ -214,7 +210,7 @@ def build_register_view(
             if len(interesses_selecionados) > 10:
                 _erro("Selecione no máximo 10 interesses.")
                 return
-            _avancar()
+            _finalizar()
 
         return ft.Column([
             ft.Text("O que você curte?", size=28, color=T.TEXT,
@@ -250,72 +246,12 @@ def build_register_view(
             ]),
         ], spacing=8)
 
-    def _passo_quiz(idx: int) -> ft.Column:
-        pergunta = PERGUNTAS[idx]
-        pid      = pergunta["id"]
-        eh_ultima = idx == _TOTAL_PERGUNTAS - 1
-        opcao_controls: List[ft.Container] = []
-
-        def _selecionar(e: ft.ControlEvent, score: int, idx_opcao: int) -> None:
-            quiz_respostas[pid] = score
-
-            for i, c in enumerate(opcao_controls):
-                sel = (i == idx_opcao)
-                c.bgcolor = "#1e1040" if sel else T.SURFACE2
-                c.border  = ft.Border.all(1, T.ACCENT if sel else T.BORDER)
-                c.content.color = T.NEON if sel else T.TEXT
-            page.update()
-
-            if eh_ultima:
-                _finalizar()
-            else:
-                _avancar()
-
-        for i, (texto_opcao, score) in enumerate(pergunta["opcoes"]):
-            def _handler(e, s=score, io=i):
-                _selecionar(e, s, io)
-
-            cont = ft.Container(
-                content=ft.Text(texto_opcao, size=13, color=T.TEXT,
-                                font_family=T.FONT_MONO),
-                bgcolor=T.SURFACE2,
-                border=ft.Border.all(1, T.BORDER),
-                border_radius=T.RADIUS,
-                padding=ft.Padding(18, 14, 18, 14),
-                on_click=_handler,
-            )
-            opcao_controls.append(cont)
-
-        num_label = ft.Container(
-            content=ft.Text(f"{idx + 1}/{_TOTAL_PERGUNTAS}", size=11,
-                            color=T.ACCENT2, font_family=T.FONT_MONO,
-                            weight=ft.FontWeight.W_600),
-            bgcolor=T.SURFACE3,
-            border_radius=20,
-            padding=ft.Padding(12, 5, 12, 5),
-        )
-
-        return ft.Column([
-            ft.Row([num_label]),
-            ft.Container(height=20),
-            ft.Text(
-                pergunta["texto"],
-                size=20,
-                color=T.TEXT,
-                weight=ft.FontWeight.W_600,
-                font_family=T.FONT_TITLE,
-            ),
-            ft.Container(height=28),
-            ft.Column(opcao_controls, spacing=10),
-        ], spacing=0)
-
     def _finalizar() -> None:
         try:
             novo = registration_service.cadastrar(
                 nome           = nome_val[0],
                 interesses     = interesses_selecionados,
                 bio            = bio_val[0],
-                respostas_quiz = quiz_respostas,
             )
             on_cadastro_ok(novo)
         except ValueError as ex:
@@ -324,8 +260,7 @@ def build_register_view(
     def _build_passo(p: int) -> ft.Column:
         if p == 0:   return _passo_nome()
         if p == 1:   return _passo_bio()
-        if p == 2:   return _passo_interesses()
-        return _passo_quiz(p - _PASSOS_INICIAIS)
+        return _passo_interesses()
 
     header = ft.Column([
         ft.Row([
