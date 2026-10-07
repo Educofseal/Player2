@@ -20,13 +20,13 @@ O card de cada perfil mostra o **caminho Dijkstra** percorrido até aquela pesso
 
 ---
 
-## Sistema de segurança — Triagem de Perfil 🛡️
+## Sistema de segurança — 🛡️
 
 O público geek tende a ser mais aberto, confiante e acessível socialmente — qualidades ótimas para formar comunidades, mas que também podem atrair usuários oportunistas. Para mitigar isso, o Player2 inclui um sistema silencioso de triagem comportamental integrado ao cadastro.
 
 ### Como funciona
 
-Durante o cadastro, após escolher nome, bio e interesses, o usuário responde **12 perguntas** apresentadas como *"Seu Estilo — como você se comporta nas comunidades geek"*. As perguntas parecem uma curadoria de preferências de jogo e convivência. O usuário não sabe que está sendo avaliado.
+Durante o cadastro, após escolher nome, bio e interesses, o usuário responde **12 perguntas** apresentadas como *"Seu Estilo — como você se comporta nas comunidades geek"*. As perguntas parecem uma curadoria de preferências de jogo e convivência.
 
 Por baixo, cada resposta é mapeada para uma das quatro dimensões do **Short Dark Tetrad (SD4)**, escala psicométrica desenvolvida por Paulhus et al. (2021):
 
