@@ -7,6 +7,9 @@ from src.core.graph import Graph
 
 def dijkstra(grafo: Graph, origem_id: int) -> Tuple[Dict[int, float], Dict[int, Optional[int]]]:
 
+    if not grafo.contem(origem_id):
+        raise KeyError(f"Usuário de origem {origem_id} não está no grafo.")
+
     distancias: Dict[int, float] = {uid: float("inf") for uid in grafo.get_todos_ids()}
     distancias[origem_id] = 0.0
 
@@ -35,13 +38,14 @@ def dijkstra(grafo: Graph, origem_id: int) -> Tuple[Dict[int, float], Dict[int, 
 
 
 def reconstruir_caminho(predecessores: Dict[int, Optional[int]], destino_id: int) -> List[int]:
+    """Caminho da origem até o destino. Para um destino inalcançável retorna só `[destino_id]`."""
 
     caminho = []
     atual = destino_id
 
     while atual is not None:
         caminho.append(atual)
-        atual = predecessores[atual]
+        atual = predecessores.get(atual)
 
     caminho.reverse()
 

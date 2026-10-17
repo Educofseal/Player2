@@ -1,2 +1,8 @@
 __pycache__/
 *.pyc
+.venv/
+venv/
+.pytest_cache/
+build/
+dist/
+player2/.usuarios-*.tmp

@@ -1,161 +1,146 @@
-import sys
 import os
+import sys
+from dataclasses import dataclass
+from typing import Awaitable, Callable, Optional
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Garante que `import src.*` funcione tanto com `python -m src.main` quanto com
+# `flet run src/main.py` (a raiz do projeto é a pasta acima de src/).
+_RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _RAIZ not in sys.path:
+    sys.path.insert(0, _RAIZ)
 
 import flet as ft
 
 from src.core.graph import Graph
 from src.core.user import User
-from src.io.file_reader import carregar_usuarios_json, carregar_usuarios_dict
+from src.io.user_store import UserStore
 from src.services.recommendation_service import RecommendationService
 from src.services.registration_service import RegistrationService
+from src.services.swipe_session import SwipeSession
 from src.ui.register_view import build_register_view
 from src.ui.swipe_view import build_swipe_view
 from src.ui.matches_view import build_matches_view
 from src.ui import theme as T
 
-DADOS_EXEMPLO = {
-    "usuarios": [
-        {"id": 1,  "nome": "João",   "interesses": ["anime", "jogos", "mangá", "rpg"]},
-        {"id": 2,  "nome": "Maria",  "interesses": ["jogos", "filmes", "anime", "cosplay"]},
-        {"id": 3,  "nome": "Lucas",  "interesses": ["rpg", "mangá", "jogos", "board games"]},
-        {"id": 4,  "nome": "Ana",    "interesses": ["cosplay", "anime", "filmes", "k-pop"]},
-        {"id": 5,  "nome": "Pedro",  "interesses": ["programação", "jogos", "hacking", "rpg"]},
-        {"id": 6,  "nome": "Julia",  "interesses": ["k-pop", "anime", "cosplay", "mangá"]},
-        {"id": 7,  "nome": "Carlos", "interesses": ["board games", "rpg", "xadrez"]},
-        {"id": 8,  "nome": "Bruna",  "interesses": ["filmes", "séries", "k-pop"]},
-        {"id": 9,  "nome": "Rafael", "interesses": ["hacking", "programação", "jogos", "anime"]},
-        {"id": 10, "nome": "Camila", "interesses": ["mangá", "anime", "cosplay", "filmes"]},
-    ]
-}
+# PLAYER2_DATA permite usar outra base (útil para testes sem mexer na original)
+CAMINHO_DADOS = os.environ.get("PLAYER2_DATA") or os.path.join(_RAIZ, "usuarios.json")
+PASTA_ASSETS  = os.path.join(_RAIZ, "assets")
+
+
+@dataclass
+class EstadoApp:
+
+    usuario:  Optional[User]          = None
+    sessao:   Optional[SwipeSession]  = None
+    atalhos:  Optional[Callable[[ft.KeyboardEvent], Awaitable[None]]] = None
+
+
+def _tela_erro(page: ft.Page, mensagem: str) -> None:
+    page.add(ft.SafeArea(ft.Container(
+        content=ft.Column([
+            T.logo(28),
+            T.titulo_tela("Não foi possível abrir a base de usuários", 22),
+            T.texto_secundario(mensagem, selectable=True),
+            T.texto_secundario(f"Arquivo: {CAMINHO_DADOS}", 11, selectable=True),
+        ], spacing=12),
+        padding=24,
+    )))
 
 
 def main(page: ft.Page) -> None:
-    page.title         = "Player2"
-    page.theme_mode    = ft.ThemeMode.DARK
-    page.bgcolor       = T.BG
-    page.padding       = 0
-    page.window.width  = 430
-    page.window.height = 820
-    page.window.resizable = True
-    page.fonts = {
-        T.FONT_TITLE: "https://fonts.gstatic.com/s/rajdhani/v15/LDI2apCSOBg7S-QT7p4HM-e1ig.woff2",
-        T.FONT_MONO:  "https://fonts.gstatic.com/s/spacemono/v13/i7dPIFZifjKcF5UAWdDRUEZ2RFq7AwU.woff2",
-    }
-    page.theme = ft.Theme(
-        color_scheme=ft.ColorScheme(
-            primary=T.ACCENT,
-            secondary=T.ACCENT2,
-            surface=T.SURFACE,
-            on_surface=T.TEXT,
-            on_primary=T.TEXT,
-        ),
-    )
+    T.aplicar_tema(page)
+    page.window.width      = 430
+    page.window.height     = 820
+    page.window.min_width  = 360
+    page.window.min_height = 640
+
+    store = UserStore(CAMINHO_DADOS)
+    try:
+        usuarios = store.carregar()
+    except (OSError, ValueError) as erro:
+        _tela_erro(page, str(erro))
+        return
 
     grafo = Graph()
-    _src_dir  = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(os.path.dirname(_src_dir), "usuarios.json")
-
-    if os.path.exists(json_path):
-        usuarios = carregar_usuarios_json(json_path)
-    else:
-        usuarios = carregar_usuarios_dict(DADOS_EXEMPLO)
-
     for u in usuarios:
         grafo.adicionar_usuario(u)
     grafo.construir_arestas()
 
-    reg_service = RegistrationService(grafo, caminho_json=json_path if os.path.exists(json_path) else None)
+    cadastro     = RegistrationService(grafo, store)
+    recomendador = RecommendationService(grafo)
+    estado       = EstadoApp()
 
-    estado = {
-        "usuario_atual":  None,
-        "matches":        [],
-        "swipe_fila":     None,
-        "swipe_idx":      None,
-        "swipe_historico": None,
-    }
+    def salvar_curtidas() -> None:
+        store.salvar(grafo.get_todos_usuarios())
 
+    def navegar(rota: str) -> None:
+        page.run_task(page.push_route, rota)
 
-    def ir_para_swipe(novo_usuario: User) -> None:
-        estado["usuario_atual"]   = novo_usuario
-        estado["matches"].clear()
-        estado["swipe_fila"]      = None
-        estado["swipe_idx"]       = None
-        estado["swipe_historico"] = None
-        page.go("/swipe")
+    def entrar(usuario: User) -> None:
+        estado.usuario = usuario
+        estado.sessao  = SwipeSession(usuario, recomendador.recomendar(usuario.id),
+                                      salvar=salvar_curtidas)
+        navegar("/swipe")
 
-    def ir_para_matches() -> None:
-        page.go("/matches")
+    def sair() -> None:
+        estado.usuario = None
+        estado.sessao  = None
+        navegar("/register")
 
-    def voltar_para_swipe() -> None:
-        page.go("/swipe")
+    def registrar_atalhos(handler: Callable[[ft.KeyboardEvent], Awaitable[None]]) -> None:
+        estado.atalhos = handler
 
-    def voltar_para_registro() -> None:
-        estado["usuario_atual"]   = None
-        estado["matches"].clear()
-        estado["swipe_fila"]      = None
-        estado["swipe_idx"]       = None
-        estado["swipe_historico"] = None
-        page.go("/register")
+    def rotear() -> None:
+        rota = page.route
+        if rota in ("/swipe", "/matches") and estado.sessao is None:
+            navegar("/register")
+            return
 
-
-    def route_change(e: ft.RouteChangeEvent) -> None:
+        estado.atalhos = None
         page.views.clear()
-        route = page.route
 
-        if route == "/swipe":
-            usuario = estado["usuario_atual"]
-            if usuario is None:
-                page.go("/register")
-                return
-
+        if rota == "/swipe":
             view = build_swipe_view(
                 page=page,
-                eu=usuario,
+                sessao=estado.sessao,
                 grafo=grafo,
-                on_ver_matches=ir_para_matches,
-                on_voltar=voltar_para_registro,
-                estado=estado,
+                on_ver_matches=lambda: navegar("/matches"),
+                on_sair=sair,
+                registrar_atalhos=registrar_atalhos,
             )
-            page.views.append(view)
-
-        elif route == "/matches":
-            usuario = estado["usuario_atual"]
-            if usuario is None:
-                page.go("/register")
-                return
+        elif rota == "/matches":
             view = build_matches_view(
                 page=page,
-                eu=usuario,
-                matches=estado["matches"],
+                sessao=estado.sessao,
+                insights=recomendador.insights(estado.usuario.id),
                 grafo=grafo,
-                on_voltar=voltar_para_swipe,
+                on_voltar=lambda: navegar("/swipe"),
             )
-            page.views.append(view)
-
         else:
             view = build_register_view(
                 page=page,
-                registration_service=reg_service,
-                on_cadastro_ok=ir_para_swipe,
+                registration_service=cadastro,
+                on_cadastro_ok=entrar,
+                on_entrar=entrar,
             )
-            page.views.append(view)
 
+        page.views.append(view)
         page.update()
 
-    def view_pop(e: ft.ViewPopEvent) -> None:
-        page.views.pop()
-        top = page.views[-1] if page.views else None
-        if top:
-            page.go(top.route)
-        else:
-            page.go("/register")
+    async def teclado(e: ft.KeyboardEvent) -> None:
+        if estado.atalhos:
+            await estado.atalhos(e)
 
-    page.on_route_change = route_change
-    page.on_view_pop     = view_pop
-    page.go("/register")
+    def voltar_view() -> None:
+        # botão "voltar" do sistema (Android / navegador)
+        if page.route == "/matches":
+            navegar("/swipe")
+
+    page.on_route_change    = rotear
+    page.on_view_pop        = voltar_view
+    page.on_keyboard_event  = teclado
+    rotear()
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.run(main, assets_dir=PASTA_ASSETS)

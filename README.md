@@ -19,8 +19,8 @@ peso = 1 / (1 + interesses_em_comum)
 A partir desse grafo, três algoritmos entram em cena:
 
 - **Dijkstra** ordena os perfis no feed pelo menor custo de caminho até você. Os mais compatíveis aparecem primeiro.
-- **BFS** calcula o grau de separação entre usuários (distância em níveis no grafo).
-- **DFS** explora componentes conectados e descobre grupos de afinidade.
+- **BFS** calcula o grau de separação (1º grau, 2º grau...) mostrado em cada card e no painel da sua rede.
+- **DFS** encontra a sua comunidade (o componente conexo em que você está) e os interesses em alta nela.
 
 O card de cada perfil mostra o **caminho Dijkstra** percorrido até aquela pessoa e o custo da conexão, para o usuário entender por que o app recomendou aquele match.
 
@@ -30,11 +30,12 @@ O card de cada perfil mostra o **caminho Dijkstra** percorrido até aquela pesso
 
 | Camada | Tecnologia |
 |---|---|
-| Interface | [Flet](https://flet.dev) (Flutter via Python) |
-| Linguagem | Python 3.9+ |
+| Interface | [Flet 1.0](https://flet.dev) (Flutter via Python), desktop ou navegador |
+| Linguagem | Python 3.10+ |
 | Algoritmos | Dijkstra, BFS e DFS implementados do zero |
-| Persistência | JSON flat-file |
-| Dependências | `flet >= 0.21.0` |
+| Persistência | JSON flat-file com escrita atômica |
+| Testes | pytest |
+| Fontes | Rajdhani, Space Mono e Inter, empacotadas em `assets/fonts` (licença OFL) |
 
 ---
 
@@ -43,8 +44,10 @@ O card de cada perfil mostra o **caminho Dijkstra** percorrido até aquela pesso
 ```
 player2/
 ├── usuarios.json                   ← base de dados de usuários
+├── assets/fonts/                   ← fontes locais (não dependem de internet)
+├── tests/                          ← testes do backend (pytest)
 └── src/
-    ├── main.py                     ← entry point + router Flet
+    ├── main.py                     ← entry point + rotas Flet
     ├── core/
     │   ├── user.py                 ← entidade User (dataclass)
     │   ├── edge.py                 ← aresta ponderada
@@ -54,15 +57,16 @@ player2/
     │   ├── bfs.py                  ← graus de separação
     │   └── dfs.py                  ← exploração + componentes
     ├── services/
-    │   ├── recommendation_service.py  ← orquestra os algoritmos
-    │   └── registration_service.py    ← cadastro e validação
+    │   ├── recommendation_service.py  ← recomendações e insights da rede
+    │   ├── registration_service.py    ← cadastro e validação
+    │   └── swipe_session.py           ← fila, curtidas, desfazer e matches
     ├── io/
-    │   └── file_reader.py          ← parsing e persistência JSON
+    │   └── user_store.py           ← leitura e gravação da base JSON
     └── ui/
-        ├── theme.py                ← design system (cores, fontes, helpers)
+        ├── theme.py                ← design system (cores, fontes, componentes)
         ├── register_view.py        ← cadastro passo a passo
-        ├── swipe_view.py           ← feed de cards + ações
-        └── matches_view.py         ← lista de matches
+        ├── swipe_view.py           ← feed de cards + gestos e atalhos
+        └── matches_view.py         ← matches + painel da sua rede
 ```
 
 ---
@@ -75,19 +79,27 @@ player2/
                   └───────────────┘
 ```
 
-1. **/register**: wizard passo a passo com nome, bio e interesses. Cada etapa ocupa a tela inteira.
+1. **/register**: wizard de 3 passos (nome, bio e interesses), com botão de voltar e Enter para avançar. Se o nome digitado já tiver perfil, aparece **Entrar como ...** para continuar de onde parou.
 
-2. **/swipe**: feed de perfis ordenado pelo Dijkstra. Cada card mostra afinidade em %, interesses em comum (verde) e únicos do outro usuário (roxo), além do caminho no grafo até aquela pessoa.
-   - 💜 **Like**: registra o match
-   - ✕ **Pass**: próximo perfil
-   - ↩ **Undo**: desfaz o último swipe
-   - ⭐ **Super**: like especial
+2. **/swipe**: feed de perfis ordenado pelo Dijkstra. Cada card mostra afinidade em %, grau de separação, interesses em comum (verde) e novos para você (roxo), além do caminho no grafo até aquela pessoa.
+   - Arraste o card para a direita para curtir ou para a esquerda para passar
+   - 💜 **Like** (→): registra o match
+   - ✕ **Pass** (←): próximo perfil
+   - ⭐ **Super** (↑): like especial, aparece primeiro nos matches
+   - ↩ **Undo** (Backspace): desfaz o último swipe
+   - Quando a fila acaba, dá para rever os perfis pulados
 
-3. **/matches**: lista todos os perfis curtidos com bio, interesses em comum e custo Dijkstra. O estado persiste ao navegar entre as telas.
+3. **/matches**: painel "Sua rede no grafo" (comunidade via DFS, conexões de 1º e 2º grau via BFS, interesses em alta) e a lista de perfis curtidos, com super likes primeiro.
+
+As curtidas ficam salvas no `usuarios.json`: ao entrar de novo com o mesmo nome, seus matches continuam lá e quem você já curtiu não volta para o feed.
+
+> É um projeto de demonstração: não há senha, então qualquer pessoa pode entrar com um nome já cadastrado.
 
 ---
 
 ## Como rodar
+
+Dentro da pasta `player2/`:
 
 ```bash
 # Instalar dependências
@@ -96,17 +108,30 @@ pip install -r requirements.txt
 # Rodar (desktop)
 python -m src.main
 
-# Rodar no browser
+# Rodar no navegador
 flet run --web src/main.py
 ```
 
-A janela abre em **430 × 820 px** (proporção mobile).
+A janela abre em **430 × 820 px** (proporção mobile). Em janelas largas o conteúdo fica centralizado.
+
+Para testar sem mexer na base original, aponte para outro arquivo (ele é criado com dados de exemplo se não existir):
+
+```bash
+PLAYER2_DATA=/tmp/usuarios_teste.json python -m src.main
+```
+
+### Testes
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
 
 ---
 
 ## Modelo de dados
 
-Usuários são armazenados em `usuarios.json`:
+Usuários são armazenados em `usuarios.json`, um por linha:
 
 ```json
 {
@@ -115,11 +140,14 @@ Usuários são armazenados em `usuarios.json`:
       "id": 1,
       "nome": "João",
       "interesses": ["anime", "jogos", "rpg", "mangá"],
-      "bio": "Mestre de RPG nas noites de sexta 🧙"
+      "bio": "Mestre de RPG nas noites de sexta 🧙",
+      "curtidas": [{"id": 3, "super": false}]
     }
   ]
 }
 ```
+
+`curtidas` é opcional e só aparece depois que o usuário curte alguém. A gravação é atômica (arquivo temporário + troca), então uma falha no meio nunca corrompe a base.
 
 O peso de cada aresta é `1 / (1 + interesses_em_comum)`, garantindo que maior afinidade signifique menor custo no Dijkstra.
 

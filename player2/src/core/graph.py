@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from src.core.user import User
 from src.core.edge import Edge
 
@@ -15,32 +15,48 @@ class Graph:
         if usuario.id not in self._adjacencia:
             self._adjacencia[usuario.id] = []
 
+    def conectar_usuario(self, usuario: User) -> None:
+        """Adiciona um usuário novo criando só as arestas dele: O(n) em vez de reconstruir tudo."""
+        if usuario.id in self._usuarios:
+            raise ValueError(f"Usuário {usuario.id} já está no grafo.")
+        outros = list(self._usuarios.values())
+        self.adicionar_usuario(usuario)
+        for outro in outros:
+            self._ligar(outro, usuario)
+
     def construir_arestas(self) -> None:
         self._arestas.clear()
         for adj in self._adjacencia.values():
             adj.clear()
 
-        ids = list(self._usuarios.keys())
+        usuarios = list(self._usuarios.values())
+        for i, u_a in enumerate(usuarios):
+            for u_b in usuarios[i + 1:]:
+                self._ligar(u_a, u_b)
 
-        for i in range(len(ids)):
-            for j in range(i + 1, len(ids)):
-                u_a = self._usuarios[ids[i]]
-                u_b = self._usuarios[ids[j]]
+    def _ligar(self, u_a: User, u_b: User) -> None:
+        em_comum = u_a.calcular_afinidade(u_b)
+        if em_comum == 0:
+            return
 
-                em_comum = u_a.calcular_afinidade(u_b)
-                if em_comum == 0:
-                    continue
+        peso_final = Edge.calcular_peso(em_comum)
 
-                peso_final = Edge.calcular_peso(em_comum)
+        self._arestas.append(Edge(u_a.id, u_b.id, em_comum, peso_final))
+        self._adjacencia[u_a.id].append((u_b.id, peso_final))
+        self._adjacencia[u_b.id].append((u_a.id, peso_final))
 
-                aresta = Edge(u_a.id, u_b.id, em_comum, peso_final)
-                self._arestas.append(aresta)
-
-                self._adjacencia[u_a.id].append((u_b.id, peso_final))
-                self._adjacencia[u_b.id].append((u_a.id, peso_final))
+    def contem(self, uid: int) -> bool:
+        return uid in self._usuarios
 
     def get_usuario(self, uid: int) -> User:
-        return self._usuarios[uid]
+        try:
+            return self._usuarios[uid]
+        except KeyError:
+            raise KeyError(f"Usuário {uid} não está no grafo.") from None
+
+    def buscar_por_nome(self, nome: str) -> Optional[User]:
+        alvo = (nome or "").strip().lower()
+        return next((u for u in self._usuarios.values() if u.nome.lower() == alvo), None)
 
     def get_todos_usuarios(self) -> List[User]:
         return list(self._usuarios.values())
