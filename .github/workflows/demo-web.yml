@@ -1,0 +1,73 @@
+# Publica a demo no GitHub Pages: o app roda inteiro no navegador (Python via Pyodide).
+# Requer Settings → Pages → Source: "GitHub Actions".
+# Em pull requests só gera o site (confere que compila); a publicação acontece a partir da main.
+name: Demo web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "player2/**"
+      - ".github/workflows/demo-web.yml"
+  pull_request:
+    paths:
+      - "player2/**"
+      - ".github/workflows/demo-web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: player2
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: player2/requirements*.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements-dev.txt
+
+      - name: Rodar testes
+        run: python -m pytest -q
+
+      - name: Gerar site estático
+        run: |
+          flet publish main.py \
+            --assets assets \
+            --distpath ../site \
+            --base-url "${{ github.event.repository.name }}" \
+            --app-name Player2 \
+            --app-short-name Player2 \
+            --app-description "Encontre seu player 2: matchmaking geek feito com grafos."
+          # tela de carregamento no fundo escuro do app (o padrão é branco)
+          sed -i 's/background: #ffffff;/background: #0a0a0f;/; s/background: #222222;/background: #0a0a0f;/' ../site/index.html
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

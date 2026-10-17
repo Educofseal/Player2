@@ -1,3 +1,5 @@
+import sys
+
 import flet as ft
 from typing import Callable, List
 
@@ -9,6 +11,9 @@ from src.core.user import User
 from src.ui import theme as T
 
 _TOTAL_PASSOS = 3
+
+# Na demo web (flet publish) o Python roda no navegador e o disco é só da aba aberta.
+_DEMO_NO_NAVEGADOR = sys.platform == "emscripten"
 
 
 def build_register_view(
@@ -148,6 +153,11 @@ def build_register_view(
             ft.Container(height=8),
             T.texto_secundario("Já tem perfil? Digite o mesmo nome para entrar.", 12,
                                text_align=ft.TextAlign.CENTER),
+            *([T.texto_secundario(
+                "Demo no navegador: experimente entrar como João, Ana ou Pedro. "
+                "O que você cadastrar fica só nesta aba.",
+                11, text_align=ft.TextAlign.CENTER, italic=True,
+            )] if _DEMO_NO_NAVEGADOR else []),
         )
 
     def _passo_bio() -> ft.Container:

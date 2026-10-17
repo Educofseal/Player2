@@ -1,0 +1,18 @@
+[project]
+name = "player2"
+version = "1.0.0"
+description = "Encontre seu player 2: matchmaking geek feito com grafos."
+requires-python = ">=3.10"
+# Só o núcleo do Flet: é o que roda no navegador (flet publish) e nos apps nativos (flet build).
+# Para desenvolver localmente use requirements.txt, que inclui os runtimes de desktop e web.
+dependencies = ["flet==1.0.4"]
+
+[tool.flet]
+org = "io.github.educofseal"
+product = "Player2"
+company = "Educofseal"
+
+[tool.flet.web]
+route_url_strategy = "hash"          # rotas funcionam em hospedagem estática (GitHub Pages)
+pwa_background_color = "#0a0a0f"
+pwa_theme_color = "#7c3aed"

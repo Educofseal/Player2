@@ -157,7 +157,7 @@ def _carimbo(texto: str, cor: str, angulo: float, opacity: float = 0, **posicao)
                         color=cor, font_family=T.FONT_TITLE),
         border=ft.Border.all(3, cor),
         border_radius=10,
-        bgcolor=ft.Colors.with_opacity(0.12, cor),
+        bgcolor=ft.Colors.with_opacity(0.92, T.SURFACE),   # fundo sólido: legível sobre o avatar
         padding=ft.Padding(12, 0, 12, 0),
         rotate=ft.Rotate(angulo),
         opacity=opacity,
@@ -432,7 +432,9 @@ def build_swipe_view(
         nonlocal dialogo_aberto
         usuario    = match.usuario
         rec        = match.recomendacao
-        titulo     = "⭐ SUPER MATCH!" if match.super_like else "💜 É UM MATCH!"
+        # ícone em vez de emoji no título: emoji em fonte customizada pode virar "☐" sem fallback
+        titulo     = "SUPER MATCH!" if match.super_like else "É UM MATCH!"
+        icone      = ft.Icons.STAR_ROUNDED if match.super_like else ft.Icons.FAVORITE_ROUNDED
         cor_titulo = T.GOLD_COLOR if match.super_like else T.LIKE_COLOR
 
         def _fechou() -> None:
@@ -450,10 +452,14 @@ def build_swipe_view(
         dlg = ft.AlertDialog(
             bgcolor=T.SURFACE,
             shape=ft.RoundedRectangleBorder(radius=T.RADIUS_LG),
-            title=ft.Text(
-                titulo, size=28, color=cor_titulo,
-                font_family=T.FONT_TITLE, weight=ft.FontWeight.W_700,
-                text_align=ft.TextAlign.CENTER,
+            title=ft.Row(
+                [
+                    ft.Icon(icone, color=cor_titulo, size=28),
+                    ft.Text(titulo, size=28, color=cor_titulo,
+                            font_family=T.FONT_TITLE, weight=ft.FontWeight.W_700),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=8,
             ),
             content=ft.Column(
                 controls=[

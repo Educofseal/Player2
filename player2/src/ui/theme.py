@@ -254,6 +254,9 @@ def cor_do_grau(grau: Optional[int]) -> str:
     return LIKE_COLOR if grau == 1 else GOLD_COLOR if grau == 2 else INFO_COLOR
 
 
-def coluna_central(content: ft.Control, expand: bool = True) -> ft.Container:
-    """Limita a largura do conteúdo e centraliza em janelas largas."""
-    return ft.Container(content=content, width=LARGURA_MAX, expand=expand)
+def coluna_central(content: ft.Control, expand: bool = True) -> ft.SafeArea:
+    """Limita a largura e centraliza em janelas largas; a SafeArea evita o notch do iPhone."""
+    return ft.SafeArea(
+        content=ft.Container(content=content, width=LARGURA_MAX, expand=expand),
+        expand=expand,
+    )

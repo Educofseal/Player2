@@ -6,3 +6,4 @@ venv/
 build/
 dist/
 player2/.usuarios-*.tmp
+site/
