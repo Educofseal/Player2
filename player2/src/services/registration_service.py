@@ -1,9 +1,8 @@
-import json
-import os
 from typing import List, Optional
 
-from src.core.user import User
+from src.core.user import User, normalizar_interesses
 from src.core.graph import Graph
+from src.io.user_store import UserStore
 
 
 INTERESSES_DISPONIVEIS = [
@@ -12,40 +11,60 @@ INTERESSES_DISPONIVEIS = [
     "música", "quadrinhos", "fantasia", "sci-fi", "streaming", "arte",
 ]
 
+NOME_MIN        = 2
+NOME_MAX        = 40
+BIO_MAX         = 160
+INTERESSES_MIN  = 1
+INTERESSES_MAX  = 10
+
 
 class RegistrationService:
 
-    def __init__(self, grafo: Graph, caminho_json: Optional[str] = None):
-        self.grafo        = grafo
-        self.caminho_json = caminho_json
+    def __init__(self, grafo: Graph, store: Optional[UserStore] = None):
+        self.grafo = grafo
+        self.store = store or UserStore(None)
 
     def proximo_id(self) -> int:
-        ids = self.grafo.get_todos_ids()
-        return max(ids) + 1 if ids else 1
+        # olha também o disco: outra sessão (modo web) pode ter cadastrado alguém
+        return max([*self.grafo.get_todos_ids(), self.store.maior_id()], default=0) + 1
 
-    def validar(self, nome: str, interesses: List[str], bio: str = "") -> List[str]:
-        erros = []
+    def buscar_por_nome(self, nome: str) -> Optional[User]:
+        return self.grafo.buscar_por_nome(nome)
 
-        if not nome or not nome.strip():
-            erros.append("O nome não pode ser vazio.")
-        elif len(nome.strip()) < 2:
-            erros.append("O nome deve ter ao menos 2 caracteres.")
-        elif len(nome.strip()) > 40:
-            erros.append("O nome deve ter no máximo 40 caracteres.")
+    def validar_nome(self, nome: Optional[str]) -> List[str]:
+        nome = (nome or "").strip()
+        if not nome:
+            return ["O nome não pode ser vazio."]
+        if len(nome) < NOME_MIN:
+            return [f"O nome deve ter ao menos {NOME_MIN} caracteres."]
+        if len(nome) > NOME_MAX:
+            return [f"O nome deve ter no máximo {NOME_MAX} caracteres."]
+        if self.buscar_por_nome(nome):
+            return [f"Já existe um usuário com o nome '{nome}'."]
+        return []
 
-        nomes_existentes = [u.nome.lower() for u in self.grafo.get_todos_usuarios()]
-        if nome.strip().lower() in nomes_existentes:
-            erros.append(f"Já existe um usuário com o nome '{nome.strip()}'.")
+    def validar_bio(self, bio: Optional[str]) -> List[str]:
+        if len((bio or "").strip()) > BIO_MAX:
+            return [f"A bio deve ter no máximo {BIO_MAX} caracteres."]
+        return []
 
-        if len(interesses) < 1:
-            erros.append("Selecione ao menos 1 interesse.")
-        elif len(interesses) > 10:
-            erros.append("Selecione no máximo 10 interesses.")
+    def validar_interesses(self, interesses: Optional[List[str]]) -> List[str]:
+        escolhidos = normalizar_interesses(interesses or [])
+        if len(escolhidos) < INTERESSES_MIN:
+            return [f"Selecione ao menos {INTERESSES_MIN} interesse."]
+        if len(escolhidos) > INTERESSES_MAX:
+            return [f"Selecione no máximo {INTERESSES_MAX} interesses."]
+        desconhecidos = [i for i in escolhidos if i not in INTERESSES_DISPONIVEIS]
+        if desconhecidos:
+            return [f"Interesse(s) desconhecido(s): {', '.join(desconhecidos)}."]
+        return []
 
-        if len(bio.strip()) > 160:
-            erros.append("A bio deve ter no máximo 160 caracteres.")
-
-        return erros
+    def validar(self, nome: Optional[str], interesses: Optional[List[str]], bio: Optional[str] = "") -> List[str]:
+        return [
+            *self.validar_nome(nome),
+            *self.validar_interesses(interesses),
+            *self.validar_bio(bio),
+        ]
 
     def cadastrar(
         self,
@@ -58,38 +77,15 @@ class RegistrationService:
         if erros:
             raise ValueError(" | ".join(erros))
 
-        novo_id = self.proximo_id()
         novo_usuario = User(
-            id          = novo_id,
-            nome        = nome.strip(),
-            interesses  = [i.lower() for i in interesses],
-            bio         = bio.strip(),
+            id          = self.proximo_id(),
+            nome        = nome,
+            interesses  = interesses,
+            bio         = bio or "",
         )
 
-        self.grafo.adicionar_usuario(novo_usuario)
-        self.grafo.construir_arestas()
-
-        if self.caminho_json:
-            self._persistir(novo_usuario)
+        # grava antes de mexer no grafo: se o disco falhar, nada fica pela metade
+        self.store.salvar([*self.grafo.get_todos_usuarios(), novo_usuario])
+        self.grafo.conectar_usuario(novo_usuario)
 
         return novo_usuario
-
-    def _persistir(self, usuario: User) -> None:
-        try:
-            if os.path.exists(self.caminho_json):
-                with open(self.caminho_json, "r", encoding="utf-8") as f:
-                    dados = json.load(f)
-            else:
-                dados = {"usuarios": []}
-
-            dados["usuarios"].append({
-                "id":          usuario.id,
-                "nome":        usuario.nome,
-                "interesses":  usuario.interesses,
-                "bio":         usuario.bio,
-            })
-
-            with open(self.caminho_json, "w", encoding="utf-8") as f:
-                json.dump(dados, f, ensure_ascii=False, indent=4)
-        except Exception:
-            pass 

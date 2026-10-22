@@ -1,1 +1,3 @@
-flet>=0.21.0
+# Versão fixa: o app quebrou antes porque `flet>=0.21` passou a instalar o Flet 1.0.
+# Atualize junto com `dependencies` no pyproject.toml.
+flet[all]==1.0.4
