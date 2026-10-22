@@ -1,3 +1,8 @@
 # Versão fixa: o app quebrou antes porque `flet>=0.21` passou a instalar o Flet 1.0.
 # Atualize junto com `dependencies` no pyproject.toml.
 flet[all]==1.0.4
+
+# Só para `flet run --web` (servidor local): o Flet 1.0.4 ainda passa
+# `openapi_prefix` ao FastAPI, que as versões novas não aceitam mais.
+# Não vai para o pyproject.toml: a demo publicada roda no navegador e não usa FastAPI.
+fastapi<0.120
